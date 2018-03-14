@@ -1,0 +1,4 @@
+vendor
+bin
+*.sock
+.DS_Store
