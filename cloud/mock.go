@@ -14,31 +14,47 @@ limitations under the License.
 package cloud
 
 import (
+	"sync"
+
 	"github.com/aws/aws-sdk-go/service/kms"
 	"github.com/aws/aws-sdk-go/service/kms/kmsiface"
 )
 
-type kmsMock struct {
+type KMSMock struct {
 	kmsiface.KMSAPI
-	encryptFunc func() (*kms.EncryptOutput, error)
-	decryptFunc func() (*kms.DecryptOutput, error)
+
+	mutex sync.Mutex
+
+	encOut *kms.EncryptOutput
+	encErr error
+	decOut *kms.DecryptOutput
+	decErr error
 }
 
-func NewKMSMock(enc string, encErr error, dec string, decErr error) *kmsMock {
-	return &kmsMock{
-		encryptFunc: func() (*kms.EncryptOutput, error) {
-			return &kms.EncryptOutput{CiphertextBlob: []byte(enc)}, encErr
-		},
-		decryptFunc: func() (*kms.DecryptOutput, error) {
-			return &kms.DecryptOutput{Plaintext: []byte(dec)}, decErr
-		},
-	}
+func (m *KMSMock) SetEncryptResp(enc string, encErr error) *KMSMock {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.encOut = &kms.EncryptOutput{CiphertextBlob: []byte(enc)}
+	m.encErr = encErr
+	return m
 }
 
-func (m *kmsMock) Encrypt(input *kms.EncryptInput) (*kms.EncryptOutput, error) {
-	return m.encryptFunc()
+func (m *KMSMock) SetDecryptResp(dec string, decErr error) *KMSMock {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.decOut = &kms.DecryptOutput{Plaintext: []byte(dec)}
+	m.decErr = decErr
+	return m
 }
 
-func (m *kmsMock) Decrypt(input *kms.DecryptInput) (*kms.DecryptOutput, error) {
-	return m.decryptFunc()
+func (m *KMSMock) Encrypt(input *kms.EncryptInput) (*kms.EncryptOutput, error) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	return m.encOut, m.encErr
+}
+
+func (m *KMSMock) Decrypt(input *kms.DecryptInput) (*kms.DecryptOutput, error) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	return m.decOut, m.decErr
 }

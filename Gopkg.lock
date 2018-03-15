@@ -4,8 +4,8 @@
 [[projects]]
   name = "github.com/aws/aws-sdk-go"
   packages = ["aws","aws/awserr","aws/awsutil","aws/client","aws/client/metadata","aws/corehandlers","aws/credentials","aws/credentials/ec2rolecreds","aws/credentials/endpointcreds","aws/credentials/stscreds","aws/defaults","aws/ec2metadata","aws/endpoints","aws/request","aws/session","aws/signer/v4","internal/sdkio","internal/sdkrand","internal/shareddefaults","private/protocol","private/protocol/json/jsonutil","private/protocol/jsonrpc","private/protocol/query","private/protocol/query/queryutil","private/protocol/rest","private/protocol/xml/xmlutil","service/kms","service/kms/kmsiface","service/sts"]
-  revision = "4c9c8e98642a1a5e7c27d7a644cf9140809d49ee"
-  version = "v1.13.13"
+  revision = "28d0127967e59b0c41cede1e8d548ed85374bbbc"
+  version = "v1.13.14"
 
 [[projects]]
   name = "github.com/go-ini/ini"
@@ -18,6 +18,12 @@
   packages = ["proto"]
   revision = "1adfc126b41513cc696b209667c8656ea7aac67c"
   version = "v1.0.0"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/golang/glog"
+  packages = ["."]
+  revision = "23def4e6c14b4da8ac2ed8007337bc5eb5007998"
 
 [[projects]]
   name = "github.com/golang/protobuf"
@@ -34,7 +40,7 @@
   branch = "master"
   name = "golang.org/x/net"
   packages = ["context","http2","http2/hpack","idna","internal/timeseries","lex/httplex","trace"]
-  revision = "892bf7b0c6e2f93b51166bf3882e50277fa5afc6"
+  revision = "e0c57d8f86c17f0724497efcb3bc617e82834821"
 
 [[projects]]
   name = "golang.org/x/text"
@@ -58,11 +64,11 @@
   branch = "master"
   name = "k8s.io/apiserver"
   packages = ["pkg/storage/value/encrypt/envelope/v1beta1"]
-  revision = "8e2fdf029740242e7ff156baa1107b07e403e241"
+  revision = "627fa76a8b04bd05ede989d2cdd22db37c055200"
 
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "62120087af9bdfd617a45ad8a0a257f2576edc933dbc5349c375eca59b9d3fea"
+  inputs-digest = "7dc7f1a3f7f5bffc9bf1d42c2242678240ba4d4b261a09f397c60d5816e568ae"
   solver-name = "gps-cdcl"
   solver-version = 1

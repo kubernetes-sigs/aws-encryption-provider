@@ -25,19 +25,19 @@ import (
 	pb "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/v1beta1"
 )
 
-type plugin struct {
+type Plugin struct {
 	svc   kmsiface.KMSAPI
-	keyId string
+	keyID string
 }
 
-func New(key string, svc kmsiface.KMSAPI) *plugin {
-	return &plugin{
+func New(key string, svc kmsiface.KMSAPI) *Plugin {
+	return &Plugin{
 		svc:   svc,
-		keyId: key,
+		keyID: key,
 	}
 }
 
-func (p *plugin) Version(ctx context.Context, request *pb.VersionRequest) (*pb.VersionResponse, error) {
+func (p *Plugin) Version(ctx context.Context, request *pb.VersionRequest) (*pb.VersionResponse, error) {
 	return &pb.VersionResponse{
 		Version:        version.APIVersion,
 		RuntimeName:    version.Runtime,
@@ -45,33 +45,46 @@ func (p *plugin) Version(ctx context.Context, request *pb.VersionRequest) (*pb.V
 	}, nil
 }
 
-func (p *plugin) Encrypt(ctx context.Context, request *pb.EncryptRequest) (*pb.EncryptResponse, error) {
+func (p *Plugin) Encrypt(ctx context.Context, request *pb.EncryptRequest) (*pb.EncryptResponse, error) {
 	input := &kms.EncryptInput{
 		Plaintext: request.Plain,
-		KeyId:     aws.String(p.keyId),
+		KeyId:     aws.String(p.keyID),
 	}
 
 	result, err := p.svc.Encrypt(input)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to encrypt data: %v", err)
+		return nil, fmt.Errorf("failed to encrypt data: %v", err)
 	}
 
 	return &pb.EncryptResponse{Cipher: result.CiphertextBlob}, nil
 }
 
-func (p *plugin) Decrypt(ctx context.Context, request *pb.DecryptRequest) (*pb.DecryptResponse, error) {
+func (p *Plugin) Decrypt(ctx context.Context, request *pb.DecryptRequest) (*pb.DecryptResponse, error) {
 	input := &kms.DecryptInput{
 		CiphertextBlob: request.Cipher,
 	}
 
 	result, err := p.svc.Decrypt(input)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to decrypt data: %v", err)
+		return nil, fmt.Errorf("failed to decrypt data: %v", err)
 	}
 
 	return &pb.DecryptResponse{Plain: result.Plaintext}, nil
 }
 
-func (p *plugin) Register(s *grpc.Server) {
+func (p *Plugin) Check(client pb.KeyManagementServiceClient) (string, error) {
+	res, err := client.Version(context.Background(), &pb.VersionRequest{})
+	if err != nil {
+		return "", err
+	}
+
+	return res.String(), nil
+}
+
+func (p *Plugin) NewClient(conn *grpc.ClientConn) pb.KeyManagementServiceClient {
+	return pb.NewKeyManagementServiceClient(conn)
+}
+
+func (p *Plugin) Register(s *grpc.Server) {
 	pb.RegisterKeyManagementServiceServer(s, p)
 }

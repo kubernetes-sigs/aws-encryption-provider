@@ -11,7 +11,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package plugin
+package integration
 
 import (
 	"context"
@@ -19,17 +19,46 @@ import (
 	"testing"
 
 	"github.com/kubernetes-sigs/aws_encryption-provider/cloud"
+	"github.com/kubernetes-sigs/aws_encryption-provider/connection"
+	"github.com/kubernetes-sigs/aws_encryption-provider/plugin"
+	"github.com/kubernetes-sigs/aws_encryption-provider/server"
 	pb "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/v1beta1"
 )
 
 var (
+	addr             = "test.sock"
 	key              = "fakekey"
 	encryptedMessage = "aGVsbG8gd29ybGQ="
 	plainMessage     = "hello world"
 	errorMessage     = fmt.Errorf("oops")
 )
 
+func setup(t *testing.T) (*server.Server, *cloud.KMSMock, pb.KeyManagementServiceClient, func() error) {
+	s := server.New()
+	c := &cloud.KMSMock{}
+	p := plugin.New(key, c)
+	p.Register(s.Server)
+	conn, err := connection.New(addr)
+	if err != nil {
+		t.Fatalf("Failed to create connection: %v", err)
+	}
+	return s, c, p.NewClient(conn), conn.Close
+}
+
 func TestEncrypt(t *testing.T) {
+	server, mock, client, closeConn := setup(t)
+
+	defer func() {
+		closeConn()
+		server.Stop()
+	}()
+
+	go func() {
+		if err := server.ListenAndServe(addr); err != nil {
+			t.Fatalf("Failed to start server: %v", err)
+		}
+	}()
+
 	tests := []struct {
 		input  string
 		output string
@@ -47,15 +76,13 @@ func TestEncrypt(t *testing.T) {
 		},
 	}
 
-	c := &cloud.KMSMock{}
 	ctx := context.Background()
 
 	for _, test := range tests {
-		c.SetEncryptResp(test.output, test.err)
-		p := New(key, c)
+		mock.SetEncryptResp(test.output, test.err)
 
 		eReq := &pb.EncryptRequest{Plain: []byte(test.input)}
-		eRes, err := p.Encrypt(ctx, eReq)
+		eRes, err := client.Encrypt(ctx, eReq)
 
 		if test.err != nil && err == nil {
 			t.Fatalf("Failed to return expected error %v", test.err)
@@ -69,8 +96,22 @@ func TestEncrypt(t *testing.T) {
 			t.Fatalf("Expected %s, but got %s", test.output, string(eRes.Cipher))
 		}
 	}
+
 }
+
 func TestDecrypt(t *testing.T) {
+	server, mock, client, closeConn := setup(t)
+
+	defer func() {
+		closeConn()
+		server.Stop()
+	}()
+
+	go func() {
+		if err := server.ListenAndServe(addr); err != nil {
+			t.Fatalf("Failed to start server: %v", err)
+		}
+	}()
 
 	tests := []struct {
 		input  string
@@ -89,15 +130,13 @@ func TestDecrypt(t *testing.T) {
 		},
 	}
 
-	c := &cloud.KMSMock{}
 	ctx := context.Background()
 
 	for _, test := range tests {
-		c.SetDecryptResp(test.output, test.err)
-		p := New(key, c)
+		mock.SetDecryptResp(test.output, test.err)
 
 		dReq := &pb.DecryptRequest{Cipher: []byte(test.input)}
-		dRes, err := p.Decrypt(ctx, dReq)
+		dRes, err := client.Decrypt(ctx, dReq)
 
 		if test.err != nil && err == nil {
 			t.Fatalf("Failed to return expected error %v", test.err)

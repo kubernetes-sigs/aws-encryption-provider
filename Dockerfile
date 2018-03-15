@@ -21,7 +21,7 @@ ARG TAG
 COPY . ./
 RUN	CGO_ENABLED=0 GOOS=linux go build -installsuffix cgo -ldflags \
     "-X github.com/kubernetes-sigs/aws_encryption-provider/version.Version=$TAG" \
-    -o bin/aws-encryption-provider
+    -o bin/aws-encryption-provider cmd/server/main.go
 
 FROM scratch AS aws-encryption-provider
 COPY --from=build /etc/ssl/certs/ /etc/ssl/certs/

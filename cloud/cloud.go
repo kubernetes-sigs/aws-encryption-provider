@@ -22,20 +22,20 @@ import (
 	"github.com/aws/aws-sdk-go/service/kms/kmsiface"
 )
 
-type awsKMS struct {
+type AWSKMS struct {
 	kmsiface.KMSAPI
 }
 
-func New(region string) (*awsKMS, error) {
+func New(region string) (*AWSKMS, error) {
 	sess, err := session.NewSession(&aws.Config{
 		Region: aws.String(region),
 	})
 
 	if err != nil {
-		return nil, fmt.Errorf("Failed to create new session: %v", err)
+		return nil, fmt.Errorf("failed to create new session: %v", err)
 	}
 
-	return &awsKMS{
+	return &AWSKMS{
 		kms.New(sess),
 	}, nil
 }

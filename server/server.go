@@ -20,20 +20,20 @@ import (
 	"google.golang.org/grpc"
 )
 
-type server struct {
+type Server struct {
 	*grpc.Server
 }
 
-func New() *server {
-	return &server{
+func New() *Server {
+	return &Server{
 		grpc.NewServer(),
 	}
 }
 
-func (s *server) ListenAndServe(addr string) error {
+func (s *Server) ListenAndServe(addr string) error {
 	l, err := net.Listen("unix", addr)
 	if err != nil {
-		return fmt.Errorf("Failed to create listener: %v", err)
+		return fmt.Errorf("failed to create listener: %v", err)
 	}
 
 	return s.Serve(l)
