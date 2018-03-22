@@ -18,10 +18,10 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/kubernetes-sigs/aws_encryption-provider/cloud"
-	"github.com/kubernetes-sigs/aws_encryption-provider/connection"
-	"github.com/kubernetes-sigs/aws_encryption-provider/plugin"
-	"github.com/kubernetes-sigs/aws_encryption-provider/server"
+	"github.com/kubernetes-sigs/aws-encryption-provider/cloud"
+	"github.com/kubernetes-sigs/aws-encryption-provider/connection"
+	"github.com/kubernetes-sigs/aws-encryption-provider/plugin"
+	"github.com/kubernetes-sigs/aws-encryption-provider/server"
 	pb "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/v1beta1"
 )
 

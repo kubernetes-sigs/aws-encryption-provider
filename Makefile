@@ -15,7 +15,7 @@ build-docker:
 
 build-server:
 	go build -ldflags \
-			"-X github.com/kubernetes-sigs/aws_encryption-provider/version.Version=${TAG}" \
+			"-X github.com/kubernetes-sigs/aws-encryption-provider/version.Version=${TAG}" \
 			-o bin/grpcserver cmd/server/main.go
 
 build-client:
