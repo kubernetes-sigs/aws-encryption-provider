@@ -29,6 +29,7 @@ type AWSKMS struct {
 func New(region string) (*AWSKMS, error) {
 	sess, err := session.NewSession(&aws.Config{
 		Region: aws.String(region),
+		CredentialsChainVerboseErrors: aws.Bool(true),
 	})
 
 	if err != nil {
