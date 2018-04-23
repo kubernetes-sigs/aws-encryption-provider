@@ -1,6 +1,7 @@
 # AWS Encryption Provider
 
-APIServer encryption provider, backed by AWS KMS
+APIServer [encryption provider](https://kubernetes.io/docs/tasks/administer-cluster/kms-provider/), backed by AWS KMS
+
 
 ## Community, discussion, contribution, and support
 
