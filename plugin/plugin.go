@@ -25,6 +25,8 @@ import (
 	pb "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/v1beta1"
 )
 
+const StorageVersion = "1"
+
 type Plugin struct {
 	svc   kmsiface.KMSAPI
 	keyID string
@@ -56,10 +58,13 @@ func (p *Plugin) Encrypt(ctx context.Context, request *pb.EncryptRequest) (*pb.E
 		return nil, fmt.Errorf("failed to encrypt data: %v", err)
 	}
 
-	return &pb.EncryptResponse{Cipher: result.CiphertextBlob}, nil
+	return &pb.EncryptResponse{Cipher: append([]byte(StorageVersion), result.CiphertextBlob...)}, nil
 }
 
 func (p *Plugin) Decrypt(ctx context.Context, request *pb.DecryptRequest) (*pb.DecryptResponse, error) {
+	if string(request.Cipher[0]) == StorageVersion {
+		request.Cipher = request.Cipher[1:]
+	}
 	input := &kms.DecryptInput{
 		CiphertextBlob: request.Cipher,
 	}

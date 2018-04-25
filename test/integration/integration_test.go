@@ -92,8 +92,8 @@ func TestEncrypt(t *testing.T) {
 			t.Fatalf("Returned unexpected error: %v", err)
 		}
 
-		if test.err == nil && string(eRes.Cipher) != test.output {
-			t.Fatalf("Expected %s, but got %s", test.output, string(eRes.Cipher))
+		if test.err == nil && string(eRes.Cipher) != plugin.StorageVersion+test.output {
+			t.Fatalf("Expected %s, but got %s", plugin.StorageVersion+test.output, string(eRes.Cipher))
 		}
 	}
 
