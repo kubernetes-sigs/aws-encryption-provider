@@ -32,10 +32,12 @@ func main() {
 	var (
 		healthzPath = flag.String("healthz-path", "/healthz", "healthcheck path")
 		healthzPort = flag.String("health-port", ":8080", "healthcheck port")
-		addr        = flag.String("listen", "/tmp/awsencryptionprovider.sock", "GRPC listen address")
+		addr        = flag.String("listen", "/var/run/kmsplugin/socket.sock", "GRPC listen address")
 		key         = flag.String("key", "", "AWS KMS Key")
 		region      = flag.String("region", "us-east-1", "AWS Region")
 	)
+
+	flag.Set("logtostderr", "true")
 
 	flag.Parse()
 
