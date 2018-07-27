@@ -22,10 +22,10 @@ import (
 	"syscall"
 
 	"github.com/golang/glog"
-	"github.com/kubernetes-sigs/aws-encryption-provider/cloud"
-	"github.com/kubernetes-sigs/aws-encryption-provider/connection"
-	"github.com/kubernetes-sigs/aws-encryption-provider/plugin"
-	"github.com/kubernetes-sigs/aws-encryption-provider/server"
+	"github.com/kubernetes-sigs/aws-encryption-provider/pkg/cloud"
+	"github.com/kubernetes-sigs/aws-encryption-provider/pkg/connection"
+	"github.com/kubernetes-sigs/aws-encryption-provider/pkg/plugin"
+	"github.com/kubernetes-sigs/aws-encryption-provider/pkg/server"
 )
 
 func main() {
