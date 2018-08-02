@@ -1,22 +1,22 @@
-REPO?=gcr.io/must-override
-IMAGE?=aws-encryption-provider
-TAG?=0.0.1
+.PHONY: gofmt
+gofmt:
+	gofmt -w -s cmd/ pkg/ test/
 
-.PHONY: test build-docker build-server build-client
+.PHONY: goimports
+goimports:
+	goimports -w cmd/ pkg/ test/
 
+.PHONY: test
 test:
-	go test ./...
+	bazel test //pkg/... //test/... --test_output=streamed
 
-build-docker:
-	docker build \
-		-t ${REPO}/${IMAGE}:latest \
-		-t ${REPO}/${IMAGE}:${TAG} \
-		--build-arg TAG=${TAG} .
+.PHONY: push
+push:
+	bazel run //images:push-aws-encryption-provider
 
-build-server:
-	go build -ldflags \
-			"-X github.com/kubernetes-sigs/aws-encryption-provider/version.Version=${TAG}" \
-			-o bin/grpcserver cmd/server/main.go
-
-build-client:
-	go build -o bin/grpcclient cmd/client/main.go
+.PHONY: dep-ensure
+dep-ensure:
+	dep ensure -v
+	find vendor/ -name "BUILD" -delete
+	find vendor/ -name "BUILD.bazel" -delete
+	bazel run //:gazelle

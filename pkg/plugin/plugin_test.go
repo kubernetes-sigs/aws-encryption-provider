@@ -30,7 +30,7 @@ var (
 )
 
 func TestEncrypt(t *testing.T) {
-	tests := []struct {
+	tt := []struct {
 		input  string
 		output string
 		err    error
@@ -50,29 +50,28 @@ func TestEncrypt(t *testing.T) {
 	c := &cloud.KMSMock{}
 	ctx := context.Background()
 
-	for _, test := range tests {
-		c.SetEncryptResp(test.output, test.err)
+	for _, tc := range tt {
+		c.SetEncryptResp(tc.output, tc.err)
 		p := New(key, c)
 
-		eReq := &pb.EncryptRequest{Plain: []byte(test.input)}
+		eReq := &pb.EncryptRequest{Plain: []byte(tc.input)}
 		eRes, err := p.Encrypt(ctx, eReq)
 
-		if test.err != nil && err == nil {
-			t.Fatalf("Failed to return expected error %v", test.err)
+		if tc.err != nil && err == nil {
+			t.Fatalf("Failed to return expected error %v", tc.err)
 		}
 
-		if test.err == nil && err != nil {
+		if tc.err == nil && err != nil {
 			t.Fatalf("Returned unexpected error: %v", err)
 		}
 
-		if test.err == nil && string(eRes.Cipher) != StorageVersion+test.output {
-			t.Fatalf("Expected %s, but got %s", StorageVersion+test.output, string(eRes.Cipher))
+		if tc.err == nil && string(eRes.Cipher) != StorageVersion+tc.output {
+			t.Fatalf("Expected %s, but got %s", StorageVersion+tc.output, string(eRes.Cipher))
 		}
 	}
 }
 func TestDecrypt(t *testing.T) {
-
-	tests := []struct {
+	tt := []struct {
 		input  string
 		output string
 		err    error
@@ -92,23 +91,23 @@ func TestDecrypt(t *testing.T) {
 	c := &cloud.KMSMock{}
 	ctx := context.Background()
 
-	for _, test := range tests {
-		c.SetDecryptResp(test.output, test.err)
+	for _, tc := range tt {
+		c.SetDecryptResp(tc.output, tc.err)
 		p := New(key, c)
 
-		dReq := &pb.DecryptRequest{Cipher: []byte(test.input)}
+		dReq := &pb.DecryptRequest{Cipher: []byte(tc.input)}
 		dRes, err := p.Decrypt(ctx, dReq)
 
-		if test.err != nil && err == nil {
-			t.Fatalf("Failed to return expected error %v", test.err)
+		if tc.err != nil && err == nil {
+			t.Fatalf("Failed to return expected error %v", tc.err)
 		}
 
-		if test.err == nil && err != nil {
+		if tc.err == nil && err != nil {
 			t.Fatalf("Returned unexpected error: %v", err)
 		}
 
-		if test.err == nil && string(dRes.Plain) != test.output {
-			t.Fatalf("Expected %s, but got %s", test.output, string(dRes.Plain))
+		if tc.err == nil && string(dRes.Plain) != tc.output {
+			t.Fatalf("Expected %s, but got %s", tc.output, string(dRes.Plain))
 		}
 	}
 }

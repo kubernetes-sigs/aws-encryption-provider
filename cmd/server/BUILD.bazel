@@ -1,0 +1,24 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "go_default_library",
+    srcs = ["main.go"],
+    importpath = "github.com/kubernetes-sigs/aws-encryption-provider/cmd/server",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//pkg/cloud:go_default_library",
+        "//pkg/connection:go_default_library",
+        "//pkg/plugin:go_default_library",
+        "//pkg/server:go_default_library",
+        "//vendor/github.com/golang/glog:go_default_library",
+    ],
+)
+
+go_binary(
+    name = "aws-encryption-provider",  #keep
+    embed = [":go_default_library"],
+    visibility = ["//visibility:public"],
+    x_defs = {
+        "github.com/kubernetes-sigs/aws-encryption-provider/pkg/version.Version": "{STABLE_DOCKER_TAG}",  #keep
+    },
+)

@@ -1,4 +1,11 @@
-vendor
 bin
-*.sock
+.bazel
 .DS_Store
+*.sock
+
+bazel-bin
+bazel-etcd-manager
+bazel-genfiles
+bazel-out
+bazel-src
+bazel-testlogs

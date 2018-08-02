@@ -1,0 +1,13 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_test")
+
+go_test(
+    name = "go_default_test",
+    srcs = ["integration_test.go"],
+    deps = [
+        "//pkg/cloud:go_default_library",
+        "//pkg/connection:go_default_library",
+        "//pkg/plugin:go_default_library",
+        "//pkg/server:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/storage/value/encrypt/envelope/v1beta1:go_default_library",
+    ],
+)

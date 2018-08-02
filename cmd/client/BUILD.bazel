@@ -1,0 +1,18 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "go_default_library",
+    srcs = ["main.go"],
+    importpath = "github.com/kubernetes-sigs/aws-encryption-provider/cmd/client",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//pkg/connection:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/storage/value/encrypt/envelope/v1beta1:go_default_library",
+    ],
+)
+
+go_binary(
+    name = "client",
+    embed = [":go_default_library"],
+    visibility = ["//visibility:public"],
+)

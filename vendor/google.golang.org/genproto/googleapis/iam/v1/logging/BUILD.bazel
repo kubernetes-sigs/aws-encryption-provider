@@ -1,0 +1,14 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "go_default_library",
+    srcs = ["audit_data.pb.go"],
+    importmap = "github.com/kubernetes-sigs/aws-encryption-provider/vendor/google.golang.org/genproto/googleapis/iam/v1/logging",
+    importpath = "google.golang.org/genproto/googleapis/iam/v1/logging",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//vendor/github.com/golang/protobuf/proto:go_default_library",
+        "@go_googleapis//google/api:annotations_go_proto",
+        "@go_googleapis//google/iam/v1:iam_go_proto",
+    ],
+)

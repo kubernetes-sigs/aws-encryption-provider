@@ -16,6 +16,7 @@ package integration
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"testing"
 
 	"github.com/kubernetes-sigs/aws-encryption-provider/pkg/cloud"
@@ -26,27 +27,33 @@ import (
 )
 
 var (
-	addr             = "test.sock"
 	key              = "fakekey"
 	encryptedMessage = "aGVsbG8gd29ybGQ="
 	plainMessage     = "hello world"
 	errorMessage     = fmt.Errorf("oops")
 )
 
-func setup(t *testing.T) (*server.Server, *cloud.KMSMock, pb.KeyManagementServiceClient, func() error) {
+func setup(t *testing.T) (string, *server.Server, *cloud.KMSMock, pb.KeyManagementServiceClient, func() error) {
 	s := server.New()
 	c := &cloud.KMSMock{}
 	p := plugin.New(key, c)
 	p.Register(s.Server)
+	dir, err := ioutil.TempDir("", "run")
+	if err != nil {
+		t.Fatalf("failed to create tmp dir: %v", err)
+	}
+
+	addr := dir + "test.sock"
+
 	conn, err := connection.New(addr)
 	if err != nil {
 		t.Fatalf("Failed to create connection: %v", err)
 	}
-	return s, c, p.NewClient(conn), conn.Close
+	return addr, s, c, p.NewClient(conn), conn.Close
 }
 
 func TestEncrypt(t *testing.T) {
-	server, mock, client, closeConn := setup(t)
+	addr, server, mock, client, closeConn := setup(t)
 
 	defer func() {
 		closeConn()
@@ -59,7 +66,7 @@ func TestEncrypt(t *testing.T) {
 		}
 	}()
 
-	tests := []struct {
+	tt := []struct {
 		input  string
 		output string
 		err    error
@@ -78,29 +85,29 @@ func TestEncrypt(t *testing.T) {
 
 	ctx := context.Background()
 
-	for _, test := range tests {
-		mock.SetEncryptResp(test.output, test.err)
+	for _, tc := range tt {
+		mock.SetEncryptResp(tc.output, tc.err)
 
-		eReq := &pb.EncryptRequest{Plain: []byte(test.input)}
+		eReq := &pb.EncryptRequest{Plain: []byte(tc.input)}
 		eRes, err := client.Encrypt(ctx, eReq)
 
-		if test.err != nil && err == nil {
-			t.Fatalf("Failed to return expected error %v", test.err)
+		if tc.err != nil && err == nil {
+			t.Fatalf("Failed to return expected error %v", tc.err)
 		}
 
-		if test.err == nil && err != nil {
+		if tc.err == nil && err != nil {
 			t.Fatalf("Returned unexpected error: %v", err)
 		}
 
-		if test.err == nil && string(eRes.Cipher) != plugin.StorageVersion+test.output {
-			t.Fatalf("Expected %s, but got %s", plugin.StorageVersion+test.output, string(eRes.Cipher))
+		if tc.err == nil && string(eRes.Cipher) != plugin.StorageVersion+tc.output {
+			t.Fatalf("Expected %s, but got %s", plugin.StorageVersion+tc.output, string(eRes.Cipher))
 		}
 	}
 
 }
 
 func TestDecrypt(t *testing.T) {
-	server, mock, client, closeConn := setup(t)
+	addr, server, mock, client, closeConn := setup(t)
 
 	defer func() {
 		closeConn()
@@ -113,7 +120,7 @@ func TestDecrypt(t *testing.T) {
 		}
 	}()
 
-	tests := []struct {
+	tt := []struct {
 		input  string
 		output string
 		err    error
@@ -132,22 +139,22 @@ func TestDecrypt(t *testing.T) {
 
 	ctx := context.Background()
 
-	for _, test := range tests {
-		mock.SetDecryptResp(test.output, test.err)
+	for _, tc := range tt {
+		mock.SetDecryptResp(tc.output, tc.err)
 
-		dReq := &pb.DecryptRequest{Cipher: []byte(test.input)}
+		dReq := &pb.DecryptRequest{Cipher: []byte(tc.input)}
 		dRes, err := client.Decrypt(ctx, dReq)
 
-		if test.err != nil && err == nil {
-			t.Fatalf("Failed to return expected error %v", test.err)
+		if tc.err != nil && err == nil {
+			t.Fatalf("Failed to return expected error %v", tc.err)
 		}
 
-		if test.err == nil && err != nil {
+		if tc.err == nil && err != nil {
 			t.Fatalf("Returned unexpected error: %v", err)
 		}
 
-		if test.err == nil && string(dRes.Plain) != test.output {
-			t.Fatalf("Expected %s, but got %s", test.output, string(dRes.Plain))
+		if tc.err == nil && string(dRes.Plain) != tc.output {
+			t.Fatalf("Expected %s, but got %s", tc.output, string(dRes.Plain))
 		}
 	}
 }
