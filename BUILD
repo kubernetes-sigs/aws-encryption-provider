@@ -14,9 +14,22 @@
 
 # gazelle:proto disable
 load("@bazel_gazelle//:def.bzl", "gazelle")
+load("@io_kubernetes_build//defs:run_in_workspace.bzl", "workspace_binary")
 
 gazelle(
     name = "gazelle",
     external = "vendored",
     prefix = "github.com/kubernetes-sigs/aws-encryption-provider",
+)
+
+workspace_binary(
+    name = "lint",
+    args = ["run"],
+    cmd = "@com_github_golangci_golangci-lint//cmd/golangci-lint",
+)
+
+workspace_binary(
+    name = "lint-full",
+    args = ["run --fast=false"],
+    cmd = "@com_github_golangci_golangci-lint//cmd/golangci-lint",
 )

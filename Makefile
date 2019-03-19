@@ -6,6 +6,14 @@ gofmt:
 goimports:
 	goimports -w cmd/ pkg/ test/
 
+.PHONY: lint
+lint: dep-ensure ## Lint codebase
+	bazel run //:lint $(BAZEL_ARGS)
+
+.PHONY: lint-full
+lint-full: dep-ensure ## Run slower linters to detect possible issues
+	bazel run //:lint-full $(BAZEL_ARGS)
+
 .PHONY: test
 test:
 	bazel test //pkg/... //test/... --test_output=streamed
@@ -17,6 +25,4 @@ push:
 .PHONY: dep-ensure
 dep-ensure:
 	dep ensure -v
-	find vendor/ -name "BUILD" -delete
-	find vendor/ -name "BUILD.bazel" -delete
 	bazel run //:gazelle
