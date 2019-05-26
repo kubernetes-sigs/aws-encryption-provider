@@ -49,13 +49,16 @@ func TestEncrypt(t *testing.T) {
 	server, mock, client, closeConn := setup(t)
 
 	defer func() {
-		closeConn()
+		if err := closeConn(); err != nil {
+			t.Fatalf("Failed to close connection: %v", err)
+		}
+
 		server.Stop()
 	}()
 
 	go func() {
 		if err := server.ListenAndServe(addr); err != nil {
-			t.Fatalf("Failed to start server: %v", err)
+			t.Errorf("Failed to start server: %v", err)
 		}
 	}()
 
@@ -103,13 +106,16 @@ func TestDecrypt(t *testing.T) {
 	server, mock, client, closeConn := setup(t)
 
 	defer func() {
-		closeConn()
+		if err := closeConn(); err != nil {
+			t.Fatalf("Failed to close connection: %v", err)
+		}
+
 		server.Stop()
 	}()
 
 	go func() {
 		if err := server.ListenAndServe(addr); err != nil {
-			t.Fatalf("Failed to start server: %v", err)
+			t.Errorf("Failed to start server: %v", err)
 		}
 	}()
 

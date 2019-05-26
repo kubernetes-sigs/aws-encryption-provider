@@ -37,7 +37,9 @@ func main() {
 		region      = flag.String("region", "us-east-1", "AWS Region")
 	)
 
-	flag.Set("logtostderr", "true")
+	if err := flag.Set("logtostderr", "true"); err != nil {
+		glog.Fatalf("Failed to set logtostderr flag: %v", err)
+	}
 
 	flag.Parse()
 

@@ -2,7 +2,10 @@ REPO?=gcr.io/must-override
 IMAGE?=aws-encryption-provider
 TAG?=0.0.1
 
-.PHONY: test build-docker build-server build-client
+.PHONY: lint test build-docker build-server build-client
+
+lint:
+	hack/verify-golint.sh
 
 test:
 	go test ./...
