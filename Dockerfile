@@ -9,18 +9,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM golang:1.10-alpine AS build
+FROM golang:1.12-alpine AS build
 RUN apk --no-cache update && \
     apk --no-cache add ca-certificates git && \
     rm -rf /var/cache/apk/*
 WORKDIR /go/src/github.com/kubernetes-sigs/aws-encryption-provider
-RUN go get -u github.com/golang/dep/cmd/dep
-COPY Gopkg.toml Gopkg.lock ./
-RUN dep ensure -v -vendor-only
 ARG TAG
 COPY . ./
 RUN	CGO_ENABLED=0 GOOS=linux go build -installsuffix cgo -ldflags \
-    "-X github.com/kubernetes-sigs/aws-encryption-provider/version.Version=$TAG" \
+    "-X github.com/kubernetes-sigs/aws-encryption-provider/pkg/version.Version=$TAG" \
     -o bin/aws-encryption-provider cmd/server/main.go
 
 FROM scratch AS aws-encryption-provider
