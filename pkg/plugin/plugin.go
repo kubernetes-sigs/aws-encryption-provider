@@ -28,6 +28,8 @@ import (
 
 const StorageVersion = "1"
 
+var _ pb.KeyManagementServiceServer = &Plugin{}
+
 type Plugin struct {
 	svc   kmsiface.KMSAPI
 	keyID string
