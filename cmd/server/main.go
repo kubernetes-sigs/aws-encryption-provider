@@ -58,11 +58,11 @@ func main() {
 		glog.Fatalf("Failed to create connection: %v", err)
 	}
 
-	client := p.NewClient(conn)
+	client := plugin.NewClient(conn)
 
 	go func() {
 		http.HandleFunc(*healthzPath, func(w http.ResponseWriter, r *http.Request) {
-			res, err := p.Check(client)
+			res, err := plugin.Check(client)
 			if err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
 				fmt.Fprint(w, http.StatusText(http.StatusInternalServerError))

@@ -16,6 +16,7 @@ package plugin
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/kms"
@@ -26,6 +27,8 @@ import (
 )
 
 const StorageVersion = "1"
+
+var _ pb.KeyManagementServiceServer = &Plugin{}
 
 type Plugin struct {
 	svc   kmsiface.KMSAPI
@@ -77,7 +80,23 @@ func (p *Plugin) Decrypt(ctx context.Context, request *pb.DecryptRequest) (*pb.D
 	return &pb.DecryptResponse{Plain: result.Plaintext}, nil
 }
 
-func (p *Plugin) Check(client pb.KeyManagementServiceClient) (string, error) {
+func (p *Plugin) Register(s *grpc.Server) {
+	pb.RegisterKeyManagementServiceServer(s, p)
+}
+
+func WaitForReady(client pb.KeyManagementServiceClient, duration time.Duration) error {
+	ctx, cancel := context.WithTimeout(context.Background(), duration)
+	defer cancel()
+
+	_, err := client.Version(ctx, &pb.VersionRequest{}, grpc.WaitForReady(true))
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func Check(client pb.KeyManagementServiceClient) (string, error) {
 	res, err := client.Version(context.Background(), &pb.VersionRequest{})
 	if err != nil {
 		return "", err
@@ -86,10 +105,6 @@ func (p *Plugin) Check(client pb.KeyManagementServiceClient) (string, error) {
 	return res.String(), nil
 }
 
-func (p *Plugin) NewClient(conn *grpc.ClientConn) pb.KeyManagementServiceClient {
+func NewClient(conn *grpc.ClientConn) pb.KeyManagementServiceClient {
 	return pb.NewKeyManagementServiceClient(conn)
-}
-
-func (p *Plugin) Register(s *grpc.Server) {
-	pb.RegisterKeyManagementServiceServer(s, p)
 }
