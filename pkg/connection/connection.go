@@ -8,6 +8,7 @@ import (
 	"google.golang.org/grpc"
 )
 
+// New returns a grpc client connection for a given unix socket file path
 func New(addr string) (*grpc.ClientConn, error) {
 	dialer := func(addr string, timeout time.Duration) (net.Conn, error) {
 		return net.DialTimeout("unix", addr, timeout)
