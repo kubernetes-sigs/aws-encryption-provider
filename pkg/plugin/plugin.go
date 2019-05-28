@@ -26,15 +26,18 @@ import (
 	pb "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/v1beta1"
 )
 
+// StorageVersion is a prefix used for versioning encrypted content
 const StorageVersion = "1"
 
 var _ pb.KeyManagementServiceServer = &Plugin{}
 
+// Plugin implements the KeyManagementServiceServer
 type Plugin struct {
 	svc   kmsiface.KMSAPI
 	keyID string
 }
 
+// New returns a new *Plugin
 func New(key string, svc kmsiface.KMSAPI) *Plugin {
 	return &Plugin{
 		svc:   svc,
@@ -42,6 +45,7 @@ func New(key string, svc kmsiface.KMSAPI) *Plugin {
 	}
 }
 
+// Version returns the plugin server version
 func (p *Plugin) Version(ctx context.Context, request *pb.VersionRequest) (*pb.VersionResponse, error) {
 	return &pb.VersionResponse{
 		Version:        version.APIVersion,
@@ -50,6 +54,7 @@ func (p *Plugin) Version(ctx context.Context, request *pb.VersionRequest) (*pb.V
 	}, nil
 }
 
+// Encrypt executes the encryption operation using AWS KMS
 func (p *Plugin) Encrypt(ctx context.Context, request *pb.EncryptRequest) (*pb.EncryptResponse, error) {
 	input := &kms.EncryptInput{
 		Plaintext: request.Plain,
@@ -64,6 +69,7 @@ func (p *Plugin) Encrypt(ctx context.Context, request *pb.EncryptRequest) (*pb.E
 	return &pb.EncryptResponse{Cipher: append([]byte(StorageVersion), result.CiphertextBlob...)}, nil
 }
 
+// Decrypt executes the decrypt operation using AWS KMS
 func (p *Plugin) Decrypt(ctx context.Context, request *pb.DecryptRequest) (*pb.DecryptResponse, error) {
 	if string(request.Cipher[0]) == StorageVersion {
 		request.Cipher = request.Cipher[1:]
@@ -80,10 +86,13 @@ func (p *Plugin) Decrypt(ctx context.Context, request *pb.DecryptRequest) (*pb.D
 	return &pb.DecryptResponse{Plain: result.Plaintext}, nil
 }
 
+// Register registers the plugin with the grpc server
 func (p *Plugin) Register(s *grpc.Server) {
 	pb.RegisterKeyManagementServiceServer(s, p)
 }
 
+// WaitForReady uses a given client to wait until the given duration for the
+// server to become ready
 func WaitForReady(client pb.KeyManagementServiceClient, duration time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), duration)
 	defer cancel()
@@ -96,6 +105,7 @@ func WaitForReady(client pb.KeyManagementServiceClient, duration time.Duration) 
 	return nil
 }
 
+// Check validates the availability of the server using the provided client
 func Check(client pb.KeyManagementServiceClient) (string, error) {
 	res, err := client.Version(context.Background(), &pb.VersionRequest{})
 	if err != nil {
@@ -105,6 +115,7 @@ func Check(client pb.KeyManagementServiceClient) (string, error) {
 	return res.String(), nil
 }
 
+// NewClient returns a KeyManagementServiceClient for a given grpc connection
 func NewClient(conn *grpc.ClientConn) pb.KeyManagementServiceClient {
 	return pb.NewKeyManagementServiceClient(conn)
 }
