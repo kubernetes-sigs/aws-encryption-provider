@@ -20,7 +20,6 @@ First you'll need to create a KMS master key. For more details you can read the 
 
 ```bash
 KEY_ID=$(aws kms create-key --query KeyMetadata.KeyId --output text)
-aws kms create-alias --alias-name alias/K8sKMSKey --target-key-id $KEY_ID
 aws kms describe-key --key-id $KEY_ID
 {
     "KeyMetadata": {
@@ -37,6 +36,8 @@ aws kms describe-key --key-id $KEY_ID
     }
 }
 ```
+
+Key aliases can be used but it is not recommended. An alias can be updated to a new key, which would break how this encryption provider works. As a result all secrets encrypted before the alias update will become unreadable.
 
 ### Deploy the aws-encryption-provider plugin
 
