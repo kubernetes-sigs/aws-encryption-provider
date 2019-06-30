@@ -100,6 +100,70 @@ resources:
 Don't forget, you'll need to mount the directory containing the unix socket that
 the KMS server is listening on into the kube-apiserver.
 
+### Bootstrap during cluster creation (kops)
+To use encryption provider during cluster creation, you need to ensure that its running
+before starting kube-apiserver. For that you need to perform the following high level steps.
+
+Note: These steps have been verified with [kops](https://github.com/kubernetes/kops) but 
+it should be similar to any other cluster bootstrapping tool.
+
+#### Run aws-encryption-provider as static pod
+You need to have encryption provider running before kube-apiserver, and to do that you can
+use [static pods](https://kubernetes.io/docs/tasks/administer-cluster/static-pod/) functionality. For kops, static pod manifests are available at `/etc/kubernetes/manifests`. You can further use kops file assets functionality to drop 
+the pod spec file in that directory.
+
+#### Use Host Network for aws-encryption-provider
+As the CNI plugin is not yet available, you need to add `hostNetwork: true` to pod spec.
+
+#### Update health port for aws-encryption-provider
+When using hostNetwork, the port `8080` used by aws-encryption-provider conflicts with
+kube-apiserver which also requires the same port. To fix this, add `-health-port=:8083`
+to args section of pod spec above. Also change the port in `containerPort` and `livenessProbe`
+sections.
+
+#### Add /var/run/kmsplugin hostMount to api server spec
+Use kops lifecycle hook to run a script/container that can update the kube-apiserver 
+manifest (available at /etc/kubernetes/manifests) to add `/var/run/kmsplugin` as hostMount. 
+
+#### Permissions
+Ensure master IAM role has permissions to encrypt/decrypt using the kms. You can achieve this
+using additionalIAMPolicies functionality of kops.
+
+After above changes, the modified pod-spec would look like:
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: aws-encryption-provider
+  namespace: kube-system
+spec:
+  containers:
+  - image: 111122223333.dkr.ecr.us-west-2.amazonaws.com/aws-encryption-provider:v0.0.1
+    name: aws-encryption-provider
+    command:
+    - /aws-encryption-provider
+    - -key=arn:aws:kms:us-west-2:111122223333:key/1234abcd-12ab-34cd-56ef-1234567890ab
+    - -region=us-west-2
+    - -listen=/var/run/kmsplugin/socket.sock
+    - -health-port=:8083
+    ports:
+    - containerPort: 8083
+      protocol: TCP
+    livenessProbe:
+      httpGet:
+        path: /healthz
+        port: 8083
+    volumeMounts:
+    - mountPath: /var/run/kmsplugin
+      name: var-run-kmsplugin
+  hostNetwork: true    
+  volumes:
+  - name: var-run-kmsplugin
+    hostPath:
+      path: /var/run/kmsplugin
+      type: DirectoryOrCreate
+```
+
 ### Rotation
 
 If you have configured your KMS master key (CMK) to have rotation enabled, AWS will
