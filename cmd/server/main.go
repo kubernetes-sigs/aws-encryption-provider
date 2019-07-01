@@ -26,6 +26,7 @@ import (
 	"github.com/kubernetes-sigs/aws-encryption-provider/pkg/connection"
 	"github.com/kubernetes-sigs/aws-encryption-provider/pkg/plugin"
 	"github.com/kubernetes-sigs/aws-encryption-provider/pkg/server"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 func main() {
@@ -73,6 +74,8 @@ func main() {
 				glog.Infof("Passed healthceck: %v", res)
 			}
 		})
+
+		http.Handle("/metrics", promhttp.Handler())
 
 		if err := http.ListenAndServe(*healthzPort, nil); err != nil {
 			glog.Fatalf("Failed to start healthcheck server: %v", err)

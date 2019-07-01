@@ -26,6 +26,13 @@ import (
 	pb "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/v1beta1"
 )
 
+const (
+	statusSuccess    = "success"
+	statusFailure    = "failure"
+	operationEncrypt = "encrypt"
+	operationDecrypt = "decrypt"
+)
+
 // StorageVersion is a prefix used for versioning encrypted content
 const StorageVersion = "1"
 
@@ -63,9 +70,11 @@ func (p *Plugin) Encrypt(ctx context.Context, request *pb.EncryptRequest) (*pb.E
 
 	result, err := p.svc.Encrypt(input)
 	if err != nil {
+		kmsOperationCounter.WithLabelValues(p.keyID, statusFailure, operationEncrypt).Inc()
 		return nil, fmt.Errorf("failed to encrypt data: %v", err)
 	}
 
+	kmsOperationCounter.WithLabelValues(p.keyID, statusSuccess, operationEncrypt).Inc()
 	return &pb.EncryptResponse{Cipher: append([]byte(StorageVersion), result.CiphertextBlob...)}, nil
 }
 
@@ -80,9 +89,11 @@ func (p *Plugin) Decrypt(ctx context.Context, request *pb.DecryptRequest) (*pb.D
 
 	result, err := p.svc.Decrypt(input)
 	if err != nil {
+		kmsOperationCounter.WithLabelValues(p.keyID, statusFailure, operationDecrypt).Inc()
 		return nil, fmt.Errorf("failed to decrypt data: %v", err)
 	}
 
+	kmsOperationCounter.WithLabelValues(p.keyID, statusSuccess, operationDecrypt).Inc()
 	return &pb.DecryptResponse{Plain: result.Plaintext}, nil
 }
 

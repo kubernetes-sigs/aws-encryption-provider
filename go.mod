@@ -11,4 +11,5 @@ require (
 	golang.org/x/sync v0.0.0-20190423024810-112230192c58 // indirect
 	google.golang.org/grpc v1.21.0
 	k8s.io/apiserver v0.0.0-20190515064100-fc28ef5782df
+	github.com/prometheus/client_golang v1.0.0
 )
