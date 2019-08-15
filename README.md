@@ -108,6 +108,8 @@ before starting kube-apiserver. For that you need to perform the following high 
 Note: These steps have been verified with [kops](https://github.com/kubernetes/kops) but 
 it should be similar to any other cluster bootstrapping tool.
 
+For exact kops instructions see `KOPS.md`.
+
 #### Run aws-encryption-provider as static pod
 You need to have encryption provider running before kube-apiserver, and to do that you can
 use [static pods](https://kubernetes.io/docs/tasks/administer-cluster/static-pod/) functionality. For kops, static pod manifests are available at `/etc/kubernetes/manifests`. You can further use kops file assets functionality to drop 
@@ -163,6 +165,25 @@ spec:
     hostPath:
       path: /var/run/kmsplugin
       type: DirectoryOrCreate
+```
+
+### Check that the provider plugin is working
+- First we create a secret: `kubectl create secret generic secret1 -n default --from-literal=mykey=mydata`
+- Then we exec into the etcd-server: `kubectl exec -it -n kube-system $(kubectl get pods -n kube-system | grep etcd-manager-main | awk '{print $1}') bash`
+- `cd /opt/etcd-v3.3.10-linux-amd64/`
+- Then check the contents of our secret in etcd store by running the following:
+```
+ETCDCTL_API=3 etcdctl \
+    --key /rootfs/etc/kubernetes/pki/kube-apiserver/etcd-client.key \
+    --cert  /rootfs/etc/kubernetes/pki/kube-apiserver/etcd-client.crt \
+    --cacert /rootfs/etc/kubernetes/pki/kube-apiserver/etcd-ca.crt  \
+    --endpoints "https://etcd-a.internal.${CLUSTER}:4001" get /registry/secrets/default/secret1
+```
+&nbsp;&nbsp;&nbsp;-- output should be something like:
+```
+0m`�He.0�cryption-provider:�1x��%�B���#JP��J���*ȝ���΂@\n�96�^��ۦ�~0| *�H��
+                    `q�*�J�.P��;&~��o#�O�8m��->8L��0�C3���A7�����~���f�V�ܬ���X��_��`�H#�D��z)+�81��qW��y��`�q��}1<LF, ��N��p����i*�aC#E�߸�s������s��l�?�a
+�AźR������.��8H�4�O
 ```
 
 ### Rotation
