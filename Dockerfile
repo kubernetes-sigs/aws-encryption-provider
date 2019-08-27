@@ -15,8 +15,15 @@ RUN apk --no-cache update && \
     rm -rf /var/cache/apk/*
 WORKDIR /go/src/github.com/kubernetes-sigs/aws-encryption-provider
 ARG TAG
-COPY . ./
 ENV GO111MODULE=on
+
+COPY go.mod .
+COPY go.sum .
+
+RUN go mod download
+
+COPY . ./
+
 RUN	CGO_ENABLED=0 GOOS=linux go build -installsuffix cgo -ldflags \
     "-X github.com/kubernetes-sigs/aws-encryption-provider/pkg/version.Version=$TAG" \
     -o bin/aws-encryption-provider cmd/server/main.go
