@@ -6,6 +6,8 @@ TAG?=0.0.1
 
 lint:
 	hack/verify-golint.sh
+	echo "Verifying vendored dependencies"
+	hack/verify-vendor.sh
 
 test:
 	go test -v -cover -race ./...
