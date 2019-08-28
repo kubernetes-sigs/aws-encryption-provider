@@ -8,7 +8,7 @@ lint:
 	hack/verify-golint.sh
 
 test:
-	go test ./...
+	go test -v -cover -race ./...
 
 build-docker:
 	docker build \
@@ -18,7 +18,7 @@ build-docker:
 
 build-server:
 	go build -ldflags \
-			"-X github.com/kubernetes-sigs/aws-encryption-provider/pkg/version.Version=${TAG}" \
+			"-X sigs.k8s.io/aws-encryption-provider/pkg/version.Version=${TAG}" \
 			-o bin/grpcserver cmd/server/main.go
 
 build-client:
