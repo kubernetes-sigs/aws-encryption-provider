@@ -1,5 +1,8 @@
 # AWS Encryption Provider
 
+[![GoDoc](https://godoc.org/sigs.k8s.io/aws-encryption-provider?status.svg)](https://godoc.org/sigs.k8s.io/aws-encryption-provider)
+[![Build Status](https://travis-ci.org/kubernetes-sigs/aws-encryption-provider.svg?branch=master)](https://travis-ci.org/kubernetes-sigs/aws-encryption-provider)
+
 This repository is an implementation of the kube-apiserver [encryption provider](https://kubernetes.io/docs/tasks/administer-cluster/kms-provider/), backed by AWS KMS.
 
 ## Use with Kubernetes
@@ -105,14 +108,14 @@ the KMS server is listening on into the kube-apiserver.
 To use encryption provider during cluster creation, you need to ensure that its running
 before starting kube-apiserver. For that you need to perform the following high level steps.
 
-Note: These steps have been verified with [kops](https://github.com/kubernetes/kops) but 
+Note: These steps have been verified with [kops](https://github.com/kubernetes/kops) but
 it should be similar to any other cluster bootstrapping tool.
 
 For exact kops instructions see `KOPS.md`.
 
 #### Run aws-encryption-provider as static pod
 You need to have encryption provider running before kube-apiserver, and to do that you can
-use [static pods](https://kubernetes.io/docs/tasks/administer-cluster/static-pod/) functionality. For kops, static pod manifests are available at `/etc/kubernetes/manifests`. You can further use kops file assets functionality to drop 
+use [static pods](https://kubernetes.io/docs/tasks/administer-cluster/static-pod/) functionality. For kops, static pod manifests are available at `/etc/kubernetes/manifests`. You can further use kops file assets functionality to drop
 the pod spec file in that directory.
 
 #### Use Host Network for aws-encryption-provider
@@ -125,8 +128,8 @@ to args section of pod spec above. Also change the port in `containerPort` and `
 sections.
 
 #### Add /var/run/kmsplugin hostMount to api server spec
-Use kops lifecycle hook to run a script/container that can update the kube-apiserver 
-manifest (available at /etc/kubernetes/manifests) to add `/var/run/kmsplugin` as hostMount. 
+Use kops lifecycle hook to run a script/container that can update the kube-apiserver
+manifest (available at /etc/kubernetes/manifests) to add `/var/run/kmsplugin` as hostMount.
 
 #### Permissions
 Ensure master IAM role has permissions to encrypt/decrypt using the kms. You can achieve this
@@ -159,7 +162,7 @@ spec:
     volumeMounts:
     - mountPath: /var/run/kmsplugin
       name: var-run-kmsplugin
-  hostNetwork: true    
+  hostNetwork: true
   volumes:
   - name: var-run-kmsplugin
     hostPath:
