@@ -63,6 +63,8 @@ func (p *Plugin) Version(ctx context.Context, request *pb.VersionRequest) (*pb.V
 
 // Encrypt executes the encryption operation using AWS KMS
 func (p *Plugin) Encrypt(ctx context.Context, request *pb.EncryptRequest) (*pb.EncryptResponse, error) {
+	startTime := time.Now()
+
 	input := &kms.EncryptInput{
 		Plaintext: request.Plain,
 		KeyId:     aws.String(p.keyID),
@@ -70,16 +72,20 @@ func (p *Plugin) Encrypt(ctx context.Context, request *pb.EncryptRequest) (*pb.E
 
 	result, err := p.svc.Encrypt(input)
 	if err != nil {
+		kmsLatencyMetric.WithLabelValues(p.keyID, statusFailure, operationEncrypt).Observe(getMillisecondsSince(startTime))
 		kmsOperationCounter.WithLabelValues(p.keyID, statusFailure, operationEncrypt).Inc()
 		return nil, fmt.Errorf("failed to encrypt data: %v", err)
 	}
 
+	kmsLatencyMetric.WithLabelValues(p.keyID, statusSuccess, operationEncrypt).Observe(getMillisecondsSince(startTime))
 	kmsOperationCounter.WithLabelValues(p.keyID, statusSuccess, operationEncrypt).Inc()
 	return &pb.EncryptResponse{Cipher: append([]byte(StorageVersion), result.CiphertextBlob...)}, nil
 }
 
 // Decrypt executes the decrypt operation using AWS KMS
 func (p *Plugin) Decrypt(ctx context.Context, request *pb.DecryptRequest) (*pb.DecryptResponse, error) {
+	startTime := time.Now()
+
 	if string(request.Cipher[0]) == StorageVersion {
 		request.Cipher = request.Cipher[1:]
 	}
@@ -89,10 +95,12 @@ func (p *Plugin) Decrypt(ctx context.Context, request *pb.DecryptRequest) (*pb.D
 
 	result, err := p.svc.Decrypt(input)
 	if err != nil {
+		kmsLatencyMetric.WithLabelValues(p.keyID, statusFailure, operationDecrypt).Observe(getMillisecondsSince(startTime))
 		kmsOperationCounter.WithLabelValues(p.keyID, statusFailure, operationDecrypt).Inc()
 		return nil, fmt.Errorf("failed to decrypt data: %v", err)
 	}
 
+	kmsLatencyMetric.WithLabelValues(p.keyID, statusSuccess, operationDecrypt).Observe(getMillisecondsSince(startTime))
 	kmsOperationCounter.WithLabelValues(p.keyID, statusSuccess, operationDecrypt).Inc()
 	return &pb.DecryptResponse{Plain: result.Plaintext}, nil
 }
@@ -129,4 +137,8 @@ func Check(client pb.KeyManagementServiceClient) (string, error) {
 // NewClient returns a KeyManagementServiceClient for a given grpc connection
 func NewClient(conn *grpc.ClientConn) pb.KeyManagementServiceClient {
 	return pb.NewKeyManagementServiceClient(conn)
+}
+
+func getMillisecondsSince(startTime time.Time) float64 {
+	return time.Since(startTime).Seconds() * 1000
 }

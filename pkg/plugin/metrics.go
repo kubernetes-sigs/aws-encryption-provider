@@ -8,6 +8,7 @@ func init() {
 
 func registerPrometheusMetrics() {
 	prometheus.MustRegister(kmsOperationCounter)
+	prometheus.MustRegister(kmsLatencyMetric)
 }
 
 var (
@@ -15,6 +16,19 @@ var (
 		prometheus.CounterOpts{
 			Name: "aws_encryption_provider_kms_operations_total",
 			Help: "total aws encryption provider kms operations",
+		},
+		[]string{
+			"key_arn",
+			"status",
+			"operation",
+		},
+	)
+
+	kmsLatencyMetric = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "aws_encryption_provider_kms_operation_latency_ms",
+			Help:    "Response latency in milliseconds for aws encryption provider kms operation ",
+			Buckets: prometheus.ExponentialBuckets(2, 2, 14),
 		},
 		[]string{
 			"key_arn",
