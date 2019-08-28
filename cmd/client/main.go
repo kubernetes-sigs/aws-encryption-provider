@@ -23,8 +23,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/kubernetes-sigs/aws-encryption-provider/pkg/connection"
 	pb "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/v1beta1"
+	"sigs.k8s.io/aws-encryption-provider/pkg/connection"
 )
 
 var (

@@ -22,11 +22,11 @@ import (
 	"syscall"
 
 	"github.com/golang/glog"
-	"github.com/kubernetes-sigs/aws-encryption-provider/pkg/cloud"
-	"github.com/kubernetes-sigs/aws-encryption-provider/pkg/connection"
-	"github.com/kubernetes-sigs/aws-encryption-provider/pkg/plugin"
-	"github.com/kubernetes-sigs/aws-encryption-provider/pkg/server"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"sigs.k8s.io/aws-encryption-provider/pkg/cloud"
+	"sigs.k8s.io/aws-encryption-provider/pkg/connection"
+	"sigs.k8s.io/aws-encryption-provider/pkg/plugin"
+	"sigs.k8s.io/aws-encryption-provider/pkg/server"
 )
 
 func main() {

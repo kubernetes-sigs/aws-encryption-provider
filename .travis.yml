@@ -1,0 +1,10 @@
+language: go
+go_import_path: sigs.k8s.io/aws-encryption-provider
+go:
+  - 1.12.x
+
+sudo: false
+
+script:
+  - hack/check-vendor.sh
+  - make lint test build-server

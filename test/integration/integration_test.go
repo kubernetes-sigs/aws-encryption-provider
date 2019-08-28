@@ -20,11 +20,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kubernetes-sigs/aws-encryption-provider/pkg/cloud"
-	"github.com/kubernetes-sigs/aws-encryption-provider/pkg/connection"
-	"github.com/kubernetes-sigs/aws-encryption-provider/pkg/plugin"
-	"github.com/kubernetes-sigs/aws-encryption-provider/pkg/server"
 	pb "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/v1beta1"
+	"sigs.k8s.io/aws-encryption-provider/pkg/cloud"
+	"sigs.k8s.io/aws-encryption-provider/pkg/connection"
+	"sigs.k8s.io/aws-encryption-provider/pkg/plugin"
+	"sigs.k8s.io/aws-encryption-provider/pkg/server"
 )
 
 var (
