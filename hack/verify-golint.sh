@@ -21,7 +21,6 @@ if ! which golangci-lint > /dev/null; then
     go get github.com/golangci/golangci-lint/cmd/golangci-lint
 fi
 
-golangci-lint run --deadline=10m 
+$GOPATH/bin/golangci-lint run --deadline=10m
 
 echo "Congratulations! All Go source files have been linted."
-
