@@ -1,7 +1,8 @@
 # AWS Encryption Provider
 
 [![GoDoc](https://godoc.org/sigs.k8s.io/aws-encryption-provider?status.svg)](https://godoc.org/sigs.k8s.io/aws-encryption-provider)
-[![Build Status](https://travis-ci.org/kubernetes-sigs/aws-encryption-provider.svg?branch=master)](https://travis-ci.org/kubernetes-sigs/aws-encryption-provider)
+[![sig-aws-encryption-provider/verify](https://testgrid.k8s.io/q/summary/sig-aws-encryption-provider/verify/tests_status?style=svg)](https://testgrid.k8s.io/sig-aws-encryption-provider#verify)
+[![sig-aws-encryption-provider/unit-test](https://testgrid.k8s.io/q/summary/sig-aws-encryption-provider/unit-test/tests_status?style=svg)](https://testgrid.k8s.io/sig-aws-encryption-provider#unit-test)
 
 This repository is an implementation of the kube-apiserver [encryption provider](https://kubernetes.io/docs/tasks/administer-cluster/kms-provider/), backed by AWS KMS.
 
