@@ -50,6 +50,7 @@ sections.
 #### Run the provider at /srv/kubernetes
 Mount the provider at a directory that is already mounted by default e.g. `/srv/kubernetes/socket.sock`. This is a work around mounting a custom path using kops lifecycles. So then your `encryptionConfig` file becomes:
 ```yaml
+apiVersion: apiserver.config.k8s.io/v1
 kind: EncryptionConfiguration
 resources:
   - resources:
@@ -82,12 +83,17 @@ spec:
       apiVersion: v1
       kind: Pod
       metadata:
+        annotations:
+          scheduler.alpha.kubernetes.io/critical-pod: ""
+        labels:
+          k8s-app: aws-encryption-provider
         name: aws-encryption-provider
         namespace: kube-system
       spec:
         containers:
         - image: <image-of-aws-provider>
           name: aws-encryption-provider
+          imagePullPolicy: Always
           command:
           - /aws-encryption-provider
           - -key=<arn-of-kms-key>
@@ -105,18 +111,15 @@ spec:
           - mountPath: /srv/kubernetes
             name: kmsplugin
         hostNetwork: true
+        priorityClassName: system-cluster-critical
         volumes:
         - name: kmsplugin
           hostPath:
             path: /srv/kubernetes
             type: DirectoryOrCreate
-        nodeSelector:
-          dedicated: master
         tolerations:
-        - key: dedicated
-          operator: Equal
-          value: master
-          effect: NoSchedule
+        - key: CriticalAddonsOnly
+          operator: Exists
 ```
 Note: The above uses labels to make sure that the pod lives on all the same nodes as the kube-apiserver. The following is the kops specification to implement node labels for the master instance group to go with the above example:
 ```yaml
