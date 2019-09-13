@@ -93,7 +93,6 @@ spec:
         containers:
         - image: <image-of-aws-provider>
           name: aws-encryption-provider
-          imagePullPolicy: Always
           command:
           - /aws-encryption-provider
           - -key=<arn-of-kms-key>
@@ -117,9 +116,6 @@ spec:
           hostPath:
             path: /srv/kubernetes
             type: DirectoryOrCreate
-        tolerations:
-        - key: CriticalAddonsOnly
-          operator: Exists
 ```
 Note: The above uses labels to make sure that the pod lives on all the same nodes as the kube-apiserver. The following is the kops specification to implement node labels for the master instance group to go with the above example:
 ```yaml
