@@ -84,7 +84,7 @@ spec:
 
 Once you have deployed the encryption provider on all the same nodes as your API
 servers, you will need to update the kube-apiserver to use the encryption
-provider by setting the `--encryption-provider` flag and with the path to
+provider by setting the `--encryption-provider-config` flag and with the path to
 your encryption configuration file. Below is an example:
 
 ```yaml
