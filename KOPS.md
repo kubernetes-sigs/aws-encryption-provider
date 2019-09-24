@@ -2,8 +2,8 @@
 ## Bootstrap AWS encryption provider using kops during cluster creation
 This guide is an extention to bootstrap instruction on README.md
 
-#### Set the `--encryption-provider` flag with kops
-To set the kubernetes `--encryption-provider` flag with kops you must add it to the kops cluster specificition.
+#### Set the `--encryption-provider-config` flag with kops
+To set the kubernetes `--encryption-provider-config` flag with kops you must add it to the kops cluster specificition.
 ```yaml
 kind: Cluster
 spec:
