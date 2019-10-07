@@ -4,10 +4,17 @@ go 1.12
 
 require (
 	github.com/aws/aws-sdk-go v1.23.11
+	github.com/gogo/protobuf v1.2.1 // indirect
 	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
-	github.com/golangci/golangci-lint v1.17.1 // indirect
+	github.com/golang/protobuf v1.3.2 // indirect
+	github.com/kr/pretty v0.1.0 // indirect
 	github.com/prometheus/client_golang v1.0.0
+	github.com/stretchr/testify v1.4.0 // indirect
+	golang.org/x/net v0.0.0-20190909003024-a7b16738d86b // indirect
+	golang.org/x/sys v0.0.0-20190911201528-7ad0cfa0b7b5 // indirect
+	golang.org/x/text v0.3.2 // indirect
 	google.golang.org/grpc v1.23.0
+	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 // indirect
 	k8s.io/apiserver v0.0.0-20190515064100-fc28ef5782df
 )
 

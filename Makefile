@@ -5,9 +5,10 @@ TAG?=0.0.1
 .PHONY: lint test build-docker build-server build-client
 
 lint:
-	hack/verify-golint.sh
 	echo "Verifying vendored dependencies"
 	hack/verify-vendor.sh
+	echo "Verifying linting"
+	hack/verify-golint.sh
 
 test:
 	go test -v -cover -race ./...
