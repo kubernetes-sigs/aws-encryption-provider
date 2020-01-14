@@ -26,10 +26,11 @@ type AWSKMS struct {
 	kmsiface.KMSAPI
 }
 
-func New(region string) (*AWSKMS, error) {
+func New(region, kmsEndpoint string) (*AWSKMS, error) {
 	sess, err := session.NewSession(&aws.Config{
-		Region: aws.String(region),
+		Region:                        aws.String(region),
 		CredentialsChainVerboseErrors: aws.Bool(true),
+		Endpoint:                      aws.String(kmsEndpoint),
 	})
 
 	if err != nil {
