@@ -21,8 +21,8 @@ build-docker:
 
 build-server:
 	go build -ldflags \
-			"-X sigs.k8s.io/aws-encryption-provider/pkg/version.Version=${TAG}" \
+			"-w -s -X sigs.k8s.io/aws-encryption-provider/pkg/version.Version=${TAG}" \
 			-o bin/grpcserver cmd/server/main.go
 
 build-client:
-	go build -o bin/grpcclient cmd/client/main.go
+	go build -ldflags "-w -s" -o bin/grpcclient cmd/client/main.go
