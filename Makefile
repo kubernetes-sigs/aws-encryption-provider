@@ -11,7 +11,7 @@ lint:
 	hack/verify-golint.sh
 
 test:
-	go test -v -cover -race ./...
+	go test -mod vendor -v -cover -race ./...
 
 build-docker:
 	docker build \
@@ -20,9 +20,10 @@ build-docker:
 		--build-arg TAG=${TAG} .
 
 build-server:
-	go build -ldflags \
+	go build -mod vendor -ldflags \
 			"-w -s -X sigs.k8s.io/aws-encryption-provider/pkg/version.Version=${TAG}" \
 			-o bin/grpcserver cmd/server/main.go
 
 build-client:
-	go build -ldflags "-w -s" -o bin/grpcclient cmd/client/main.go
+	go build -mod vendor -ldflags "-w -s" -o bin/grpcclient cmd/client/main.go
+
