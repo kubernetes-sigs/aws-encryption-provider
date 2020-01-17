@@ -21,7 +21,7 @@ RUN	CGO_ENABLED=0 GOOS=linux go build -mod vendor -ldflags \
     "-w -s -X sigs.k8s.io/aws-encryption-provider/pkg/version.Version=$TAG" \
     -o bin/aws-encryption-provider cmd/server/main.go
 
-FROM scratch AS aws-encryption-provider
+FROM busybox AS aws-encryption-provider
 COPY --from=build /etc/ssl/certs/ /etc/ssl/certs/
 COPY --from=build /go/src/sigs.k8s.io/aws-encryption-provider/bin/aws-encryption-provider /aws-encryption-provider
 ENTRYPOINT ["/aws-encryption-provider"]
