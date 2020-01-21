@@ -9,15 +9,15 @@ import (
 //
 // This is intended to be used with zap.ReplaceGlobals() in an application's
 // main.go.
-func NewStandardLogger() (l *zap.Logger, err error) {
-	config := NewStandardZapConfig()
+func NewStandardLogger(logLevel zapcore.Level) (l *zap.Logger, err error) {
+	config := NewStandardZapConfig(logLevel)
 	return config.Build()
 }
 
 // NewStandardZapConfig returns a sensible [config](https://godoc.org/go.uber.org/zap#Config) for a Zap logger.
-func NewStandardZapConfig() zap.Config {
+func NewStandardZapConfig(logLevel zapcore.Level) zap.Config {
 	return zap.Config{
-		Level:       zap.NewAtomicLevel(),
+		Level:       zap.NewAtomicLevelAt(logLevel),
 		Development: false,
 		Sampling: &zap.SamplingConfig{
 			Initial:    100,
