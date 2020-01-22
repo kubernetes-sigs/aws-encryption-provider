@@ -13,6 +13,7 @@ require (
 	golang.org/x/net v0.0.0-20190909003024-a7b16738d86b // indirect
 	golang.org/x/sys v0.0.0-20190911201528-7ad0cfa0b7b5 // indirect
 	golang.org/x/text v0.3.2 // indirect
+	golang.org/x/time v0.0.0-20161028155119-f51c12702a4d
 	google.golang.org/grpc v1.23.0
 	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 // indirect
 	k8s.io/apiserver v0.0.0-20190515064100-fc28ef5782df

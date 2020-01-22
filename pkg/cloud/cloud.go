@@ -20,19 +20,31 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/kms"
 	"github.com/aws/aws-sdk-go/service/kms/kmsiface"
+	"sigs.k8s.io/aws-encryption-provider/pkg/httputil"
 )
 
 type AWSKMS struct {
 	kmsiface.KMSAPI
 }
 
-func New(region, kmsEndpoint string) (*AWSKMS, error) {
-	sess, err := session.NewSession(&aws.Config{
+func New(region, kmsEndpoint string, qps, burst int) (*AWSKMS, error) {
+	cfg := &aws.Config{
 		Region:                        aws.String(region),
 		CredentialsChainVerboseErrors: aws.Bool(true),
 		Endpoint:                      aws.String(kmsEndpoint),
-	})
+	}
+	if qps > 0 {
+		var err error
+		cfg.HTTPClient, err = httputil.NewRateLimitedClient(
+			qps,
+			burst,
+		)
+		if err != nil {
+			return nil, err
+		}
+	}
 
+	sess, err := session.NewSession(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new session: %v", err)
 	}
