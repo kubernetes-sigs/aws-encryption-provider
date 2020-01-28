@@ -15,6 +15,7 @@ package plugin
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 
@@ -32,18 +33,33 @@ var (
 func TestEncrypt(t *testing.T) {
 	tt := []struct {
 		input  string
+		ctx    map[string]string
 		output string
 		err    error
 	}{
 		{
 			input:  plainMessage,
+			ctx:    nil,
 			output: encryptedMessage,
 			err:    nil,
 		},
 		{
 			input:  plainMessage,
-			output: encryptedMessage,
+			ctx:    nil,
+			output: "",
 			err:    errorMessage,
+		},
+		{
+			input:  plainMessage,
+			ctx:    make(map[string]string),
+			output: encryptedMessage,
+			err:    nil,
+		},
+		{
+			input:  encryptedMessage,
+			ctx:    map[string]string{"a": "b"},
+			output: "",
+			err:    errors.New("invalid context"),
 		},
 	}
 
@@ -52,7 +68,7 @@ func TestEncrypt(t *testing.T) {
 
 	for _, tc := range tt {
 		c.SetEncryptResp(tc.output, tc.err)
-		p := New(key, c)
+		p := New(key, c, nil)
 
 		eReq := &pb.EncryptRequest{Plain: []byte(tc.input)}
 		eRes, err := p.Encrypt(ctx, eReq)
@@ -73,18 +89,27 @@ func TestEncrypt(t *testing.T) {
 func TestDecrypt(t *testing.T) {
 	tt := []struct {
 		input  string
+		ctx    map[string]string
 		output string
 		err    error
 	}{
 		{
 			input:  encryptedMessage,
+			ctx:    nil,
 			output: plainMessage,
 			err:    nil,
 		},
 		{
 			input:  encryptedMessage,
-			output: plainMessage,
+			ctx:    nil,
+			output: "",
 			err:    errorMessage,
+		},
+		{
+			input:  encryptedMessage,
+			ctx:    map[string]string{"a": "b"},
+			output: "",
+			err:    errors.New("invalid context"),
 		},
 	}
 
@@ -93,7 +118,7 @@ func TestDecrypt(t *testing.T) {
 
 	for _, tc := range tt {
 		c.SetDecryptResp(tc.output, tc.err)
-		p := New(key, c)
+		p := New(key, c, tc.ctx)
 
 		dReq := &pb.DecryptRequest{Cipher: []byte(tc.input)}
 		dRes, err := p.Decrypt(ctx, dReq)

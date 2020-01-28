@@ -41,16 +41,24 @@ var _ pb.KeyManagementServiceServer = &Plugin{}
 
 // Plugin implements the KeyManagementServiceServer
 type Plugin struct {
-	svc   kmsiface.KMSAPI
-	keyID string
+	svc           kmsiface.KMSAPI
+	keyID         string
+	encryptionCtx map[string]*string
 }
 
 // New returns a new *Plugin
-func New(key string, svc kmsiface.KMSAPI) *Plugin {
-	return &Plugin{
+func New(key string, svc kmsiface.KMSAPI, encryptionCtx map[string]string) *Plugin {
+	p := &Plugin{
 		svc:   svc,
 		keyID: key,
 	}
+	if len(encryptionCtx) > 0 {
+		p.encryptionCtx = make(map[string]*string)
+	}
+	for k, v := range encryptionCtx {
+		p.encryptionCtx[k] = aws.String(v)
+	}
+	return p
 }
 
 // Version returns the plugin server version
@@ -70,6 +78,10 @@ func (p *Plugin) Encrypt(ctx context.Context, request *pb.EncryptRequest) (*pb.E
 	input := &kms.EncryptInput{
 		Plaintext: request.Plain,
 		KeyId:     aws.String(p.keyID),
+	}
+	if len(p.encryptionCtx) > 0 {
+		zap.L().Debug("configuring encryption context", zap.String("ctx", fmt.Sprintf("%v", p.encryptionCtx)))
+		input.EncryptionContext = p.encryptionCtx
 	}
 
 	result, err := p.svc.Encrypt(input)
@@ -96,6 +108,10 @@ func (p *Plugin) Decrypt(ctx context.Context, request *pb.DecryptRequest) (*pb.D
 	}
 	input := &kms.DecryptInput{
 		CiphertextBlob: request.Cipher,
+	}
+	if len(p.encryptionCtx) > 0 {
+		zap.L().Debug("configuring encryption context", zap.String("ctx", fmt.Sprintf("%v", p.encryptionCtx)))
+		input.EncryptionContext = p.encryptionCtx
 	}
 
 	result, err := p.svc.Decrypt(input)
