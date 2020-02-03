@@ -59,6 +59,12 @@ func main() {
 
 	zap.ReplaceGlobals(l)
 
+	zap.L().Info("creating kms server",
+		zap.String("region", *region),
+		zap.String("kms-endpoint", *kmsEndpoint),
+		zap.Int("qps-limit", *qpsLimit),
+		zap.Int("burst-limit", *burstLimit),
+	)
 	c, err := cloud.New(*region, *kmsEndpoint, *qpsLimit, *burstLimit)
 	if err != nil {
 		zap.L().Fatal("Failed to create new KMS service", zap.Error(err))
