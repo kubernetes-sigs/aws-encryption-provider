@@ -17,8 +17,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
+	"time"
 
+	"go.uber.org/zap"
 	pb "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/v1beta1"
 	"sigs.k8s.io/aws-encryption-provider/pkg/cloud"
 )
@@ -67,23 +70,28 @@ func TestEncrypt(t *testing.T) {
 	ctx := context.Background()
 
 	for _, tc := range tt {
-		c.SetEncryptResp(tc.output, tc.err)
-		p := New(key, c, nil)
+		func() {
+			c.SetEncryptResp(tc.output, tc.err)
+			p := New(key, c, nil)
+			defer func() {
+				p.stopCheckHealth()
+			}()
 
-		eReq := &pb.EncryptRequest{Plain: []byte(tc.input)}
-		eRes, err := p.Encrypt(ctx, eReq)
+			eReq := &pb.EncryptRequest{Plain: []byte(tc.input)}
+			eRes, err := p.Encrypt(ctx, eReq)
 
-		if tc.err != nil && err == nil {
-			t.Fatalf("Failed to return expected error %v", tc.err)
-		}
+			if tc.err != nil && err == nil {
+				t.Fatalf("Failed to return expected error %v", tc.err)
+			}
 
-		if tc.err == nil && err != nil {
-			t.Fatalf("Returned unexpected error: %v", err)
-		}
+			if tc.err == nil && err != nil {
+				t.Fatalf("Returned unexpected error: %v", err)
+			}
 
-		if tc.err == nil && string(eRes.Cipher) != StorageVersion+tc.output {
-			t.Fatalf("Expected %s, but got %s", StorageVersion+tc.output, string(eRes.Cipher))
-		}
+			if tc.err == nil && string(eRes.Cipher) != StorageVersion+tc.output {
+				t.Fatalf("Expected %s, but got %s", StorageVersion+tc.output, string(eRes.Cipher))
+			}
+		}()
 	}
 }
 func TestDecrypt(t *testing.T) {
@@ -117,22 +125,115 @@ func TestDecrypt(t *testing.T) {
 	ctx := context.Background()
 
 	for _, tc := range tt {
-		c.SetDecryptResp(tc.output, tc.err)
-		p := New(key, c, tc.ctx)
+		func() {
+			c.SetDecryptResp(tc.output, tc.err)
+			p := New(key, c, tc.ctx)
+			defer func() {
+				p.stopCheckHealth()
+			}()
 
-		dReq := &pb.DecryptRequest{Cipher: []byte(tc.input)}
-		dRes, err := p.Decrypt(ctx, dReq)
+			dReq := &pb.DecryptRequest{Cipher: []byte(tc.input)}
+			dRes, err := p.Decrypt(ctx, dReq)
 
-		if tc.err != nil && err == nil {
-			t.Fatalf("Failed to return expected error %v", tc.err)
+			if tc.err != nil && err == nil {
+				t.Fatalf("Failed to return expected error %v", tc.err)
+			}
+
+			if tc.err == nil && err != nil {
+				t.Fatalf("Returned unexpected error: %v", err)
+			}
+
+			if tc.err == nil && string(dRes.Plain) != tc.output {
+				t.Fatalf("Expected %s, but got %s", tc.output, string(dRes.Plain))
+			}
+		}()
+	}
+}
+
+func TestHealth(t *testing.T) {
+	zap.ReplaceGlobals(zap.NewExample())
+
+	tt := []struct {
+		encryptErr error
+		decryptErr error
+	}{
+		{
+			encryptErr: nil,
+			decryptErr: nil,
+		},
+		{
+			encryptErr: errors.New("encrypt fail"),
+			decryptErr: errors.New("decrypt fail"),
+		},
+	}
+	for idx, entry := range tt {
+		c := &cloud.KMSMock{}
+
+		p := New(key, c, nil)
+		defer func() {
+			p.stopCheckHealth()
+		}()
+
+		c.SetEncryptResp("foo", entry.encryptErr)
+		c.SetDecryptResp("foo", entry.decryptErr)
+
+		_, encErr := p.Encrypt(context.Background(), &pb.EncryptRequest{Plain: []byte("foo")})
+		if entry.encryptErr == nil && encErr != nil {
+			t.Fatalf("#%d: unexpected error from Encrypt %v", idx, encErr)
+		}
+		herr1 := p.Health()
+		if entry.encryptErr == nil {
+			if herr1 != nil {
+				t.Fatalf("#%d: unexpected error from Health %v", idx, herr1)
+			}
+		} else if !strings.HasSuffix(encErr.Error(), entry.encryptErr.Error()) {
+			t.Fatalf("#%d: unexpected error from Health %v", idx, herr1)
 		}
 
-		if tc.err == nil && err != nil {
-			t.Fatalf("Returned unexpected error: %v", err)
+		_, decErr := p.Decrypt(context.Background(), &pb.DecryptRequest{Cipher: []byte("foo")})
+		if entry.decryptErr == nil && decErr != nil {
+			t.Fatalf("#%d: unexpected error from Encrypt %v", idx, decErr)
 		}
+		herr2 := p.Health()
+		if entry.decryptErr == nil {
+			if herr2 != nil {
+				t.Fatalf("#%d: unexpected error from Health %v", idx, herr2)
+			}
+		} else if !strings.HasSuffix(decErr.Error(), entry.decryptErr.Error()) {
+			t.Fatalf("#%d: unexpected error from Health %v", idx, herr2)
+		}
+	}
+}
 
-		if tc.err == nil && string(dRes.Plain) != tc.output {
-			t.Fatalf("Expected %s, but got %s", tc.output, string(dRes.Plain))
+// TestHealthManyRequests sends many requests to fill up the error channel,
+// and ensures following encrypt/decrypt operation do not block.
+func TestHealthManyRequests(t *testing.T) {
+	zap.ReplaceGlobals(zap.NewExample())
+
+	c := &cloud.KMSMock{}
+
+	p := newPlugin(key, c, nil, defaultHealthCheckPeriod, 0)
+	defer func() {
+		p.stopCheckHealth()
+	}()
+
+	c.SetEncryptResp("foo", errors.New("fail"))
+	for i := 0; i < 10; i++ {
+		errc := make(chan error)
+		go func() {
+			_, err := p.Encrypt(
+				context.Background(),
+				&pb.EncryptRequest{Plain: []byte("foo")},
+			)
+			errc <- err
+		}()
+		select {
+		case <-time.After(time.Second):
+			t.Fatalf("#%d: Encrypt took longer than it should", i)
+		case err := <-errc:
+			if !strings.HasSuffix(err.Error(), "fail") {
+				t.Fatalf("#%d: unexpected errro %v", i, err)
+			}
 		}
 	}
 }

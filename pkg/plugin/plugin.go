@@ -16,9 +16,11 @@ package plugin
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
+	awsreq "github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/service/kms"
 	"github.com/aws/aws-sdk-go/service/kms/kmsiface"
 	"go.uber.org/zap"
@@ -28,10 +30,11 @@ import (
 )
 
 const (
-	statusSuccess    = "success"
-	statusFailure    = "failure"
-	operationEncrypt = "encrypt"
-	operationDecrypt = "decrypt"
+	statusSuccess         = "success"
+	statusFailure         = "failure"
+	statusFailureThrottle = "failure-throttle"
+	operationEncrypt      = "encrypt"
+	operationDecrypt      = "decrypt"
 )
 
 // StorageVersion is a prefix used for versioning encrypted content
@@ -44,13 +47,50 @@ type Plugin struct {
 	svc           kmsiface.KMSAPI
 	keyID         string
 	encryptionCtx map[string]*string
+
+	lastMu  sync.RWMutex
+	lastErr error
+	lastTs  time.Time
+
+	healthCheckPeriod         time.Duration
+	healthCheckErrc           chan error
+	healthCheckStopcCloseOnce *sync.Once
+	healthCheckStopc          chan struct{}
+	healthCheckClosed         chan struct{}
 }
+
+// TODO: make configurable
+const (
+	defaultHealthCheckPeriod = 30 * time.Second
+	defaultErrcBufSize       = 100
+)
 
 // New returns a new *Plugin
 func New(key string, svc kmsiface.KMSAPI, encryptionCtx map[string]string) *Plugin {
+	return newPlugin(
+		key,
+		svc,
+		encryptionCtx,
+		defaultHealthCheckPeriod,
+		defaultErrcBufSize,
+	)
+}
+
+func newPlugin(
+	key string,
+	svc kmsiface.KMSAPI,
+	encryptionCtx map[string]string,
+	checkPeriod time.Duration,
+	errcBuf int,
+) *Plugin {
 	p := &Plugin{
-		svc:   svc,
-		keyID: key,
+		svc:                       svc,
+		keyID:                     key,
+		healthCheckPeriod:         checkPeriod,
+		healthCheckErrc:           make(chan error, errcBuf),
+		healthCheckStopcCloseOnce: new(sync.Once),
+		healthCheckStopc:          make(chan struct{}),
+		healthCheckClosed:         make(chan struct{}),
 	}
 	if len(encryptionCtx) > 0 {
 		p.encryptionCtx = make(map[string]*string)
@@ -58,7 +98,77 @@ func New(key string, svc kmsiface.KMSAPI, encryptionCtx map[string]string) *Plug
 	for k, v := range encryptionCtx {
 		p.encryptionCtx[k] = aws.String(v)
 	}
+	go p.startCheckHealth()
 	return p
+}
+
+func (p *Plugin) startCheckHealth() {
+	zap.L().Info("starting health check routine", zap.String("period", p.healthCheckPeriod.String()))
+	for {
+		select {
+		case <-p.healthCheckStopc:
+			zap.L().Warn("exiting health check routine")
+			p.healthCheckClosed <- struct{}{}
+			return
+		case err := <-p.healthCheckErrc:
+			p.recordErr(err)
+		}
+	}
+}
+
+func (p *Plugin) stopCheckHealth() {
+	p.healthCheckStopcCloseOnce.Do(func() {
+		close(p.healthCheckStopc)
+		<-p.healthCheckClosed
+	})
+}
+
+func (p *Plugin) isRecentlyChecked() (bool, error) {
+	p.lastMu.RLock()
+	err, ts := p.lastErr, p.lastTs
+	never, latest := err == nil && ts.IsZero(), time.Since(ts) < p.healthCheckPeriod
+	p.lastMu.RUnlock()
+	return !never && latest, err
+}
+
+func (p *Plugin) recordErr(err error) {
+	p.lastMu.Lock()
+	p.lastErr, p.lastTs = err, time.Now()
+	p.lastMu.Unlock()
+}
+
+// Health checks KMS API availability.
+//
+// The goal is to:
+//  1. not incur extra KMS API call if plugin "Encrypt" method has already
+//  2. return latest health status (cached KMS status must reflect the current)
+//
+// The error is sent via channel and consumed by goroutine.
+// The error channel may be full and block, when there are too many failures.
+// The error channel may be empty and block, when there's no failure.
+// To handle those two cases, keep track latest health check timestamps.
+//
+// Call KMS "Encrypt" API call iff:
+//  1. there was never a health check done
+//  2. there was no health check done for the last "healthCheckPeriod"
+//     (only use the cached error if the error is from recent API call)
+//
+func (p *Plugin) Health() error {
+	recent, err := p.isRecentlyChecked()
+	if !recent {
+		_, err = p.Encrypt(context.Background(), &pb.EncryptRequest{Plain: []byte("foo")})
+		p.recordErr(err)
+		if err != nil {
+			zap.L().Warn("health check failed", zap.Error(err))
+		}
+		return err
+	}
+	if err != nil {
+		zap.L().Warn("health check fail", zap.Error(err))
+	} else {
+		zap.L().Debug("health check success")
+	}
+	return err
 }
 
 // Version returns the plugin server version
@@ -86,9 +196,14 @@ func (p *Plugin) Encrypt(ctx context.Context, request *pb.EncryptRequest) (*pb.E
 
 	result, err := p.svc.Encrypt(input)
 	if err != nil {
+		select {
+		case p.healthCheckErrc <- err:
+		default:
+		}
 		zap.L().Error("request to encrypt failed", zap.Error(err))
-		kmsLatencyMetric.WithLabelValues(p.keyID, statusFailure, operationEncrypt).Observe(getMillisecondsSince(startTime))
-		kmsOperationCounter.WithLabelValues(p.keyID, statusFailure, operationEncrypt).Inc()
+		failLabel := getStatusLabel(err)
+		kmsLatencyMetric.WithLabelValues(p.keyID, failLabel, operationEncrypt).Observe(getMillisecondsSince(startTime))
+		kmsOperationCounter.WithLabelValues(p.keyID, failLabel, operationEncrypt).Inc()
 		return nil, fmt.Errorf("failed to encrypt data: %v", err)
 	}
 
@@ -116,9 +231,14 @@ func (p *Plugin) Decrypt(ctx context.Context, request *pb.DecryptRequest) (*pb.D
 
 	result, err := p.svc.Decrypt(input)
 	if err != nil {
+		select {
+		case p.healthCheckErrc <- err:
+		default:
+		}
 		zap.L().Error("request to decrypt failed", zap.Error(err))
-		kmsLatencyMetric.WithLabelValues(p.keyID, statusFailure, operationDecrypt).Observe(getMillisecondsSince(startTime))
-		kmsOperationCounter.WithLabelValues(p.keyID, statusFailure, operationDecrypt).Inc()
+		failLabel := getStatusLabel(err)
+		kmsLatencyMetric.WithLabelValues(p.keyID, failLabel, operationDecrypt).Observe(getMillisecondsSince(startTime))
+		kmsOperationCounter.WithLabelValues(p.keyID, failLabel, operationDecrypt).Inc()
 		return nil, fmt.Errorf("failed to decrypt data: %v", err)
 	}
 
@@ -165,4 +285,15 @@ func NewClient(conn *grpc.ClientConn) pb.KeyManagementServiceClient {
 
 func getMillisecondsSince(startTime time.Time) float64 {
 	return time.Since(startTime).Seconds() * 1000
+}
+
+func getStatusLabel(err error) string {
+	switch {
+	case err == nil:
+		return statusSuccess
+	case awsreq.IsErrorThrottle(err):
+		return statusFailureThrottle
+	default:
+		return statusFailure
+	}
 }

@@ -25,7 +25,7 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"sigs.k8s.io/aws-encryption-provider/pkg/cloud"
-	"sigs.k8s.io/aws-encryption-provider/pkg/connection"
+	"sigs.k8s.io/aws-encryption-provider/pkg/healthz"
 	"sigs.k8s.io/aws-encryption-provider/pkg/logging"
 	"sigs.k8s.io/aws-encryption-provider/pkg/plugin"
 	"sigs.k8s.io/aws-encryption-provider/pkg/server"
@@ -60,7 +60,10 @@ func main() {
 	zap.ReplaceGlobals(l)
 
 	zap.L().Info("creating kms server",
+		zap.String("healthz-path", *healthzPath),
+		zap.String("healthz-port", *healthzPort),
 		zap.String("region", *region),
+		zap.String("listen-address", *addr),
 		zap.String("kms-endpoint", *kmsEndpoint),
 		zap.Int("qps-limit", *qpsLimit),
 		zap.Int("burst-limit", *burstLimit),
@@ -77,32 +80,10 @@ func main() {
 
 	s := server.New()
 	p := plugin.New(*key, c, *encryptionCtx)
-
 	p.Register(s.Server)
-
-	conn, err := connection.New(*addr)
-	if err != nil {
-		zap.L().Fatal("Failed to create connection", zap.Error(err))
-	}
-
-	client := plugin.NewClient(conn)
-
 	go func() {
-		http.HandleFunc(*healthzPath, func(w http.ResponseWriter, r *http.Request) {
-			res, err := plugin.Check(client)
-			if err != nil {
-				w.WriteHeader(http.StatusInternalServerError)
-				fmt.Fprint(w, http.StatusText(http.StatusInternalServerError))
-				zap.L().Error("Failed healthceck", zap.Error(err))
-			} else {
-				w.WriteHeader(http.StatusOK)
-				fmt.Fprint(w, http.StatusText(http.StatusOK))
-				zap.L().Info("Passed healthceck", zap.String("version", res))
-			}
-		})
-
+		http.Handle(*healthzPath, healthz.NewHandler(p))
 		http.Handle("/metrics", promhttp.Handler())
-
 		if err := http.ListenAndServe(*healthzPort, nil); err != nil {
 			zap.L().Fatal("Failed to start healthcheck server", zap.Error(err))
 		}
@@ -123,8 +104,6 @@ func main() {
 	signal := <-signals
 
 	zap.L().Info("Received signal", zap.Stringer("signal", signal))
-	zap.L().Info("Closing client connection")
-	conn.Close()
 	zap.L().Info("Shutting down server")
 	s.GracefulStop()
 	zap.L().Info("Exiting...")
