@@ -7,6 +7,6 @@ VENDOR_DIFF_LINES=$(git diff --numstat)
 
 if [[ -n "$VENDOR_DIFF_LINES" ]]; then
     echo "Vendored code did not match was expected"
-    git -P diff --stat
+    git diff --stat
     exit 1
 fi
