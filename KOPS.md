@@ -95,10 +95,10 @@ spec:
           name: aws-encryption-provider
           command:
           - /aws-encryption-provider
-          - -key=<arn-of-kms-key>
-          - -region=<region-of-kms-key>
-          - -listen=/srv/kubernetes/socket.sock
-          - -health-port=:8083
+          - --key=<arn-of-kms-key>
+          - --region=<region-of-kms-key>
+          - --listen=/srv/kubernetes/socket.sock
+          - --health-port=:8083
           ports:
           - containerPort: 8083
             protocol: TCP

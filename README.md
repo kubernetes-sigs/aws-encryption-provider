@@ -62,9 +62,9 @@ spec:
     name: aws-encryption-provider
     command:
     - /aws-encryption-provider
-    - -key=arn:aws:kms:us-west-2:111122223333:key/1234abcd-12ab-34cd-56ef-1234567890ab
-    - -region=us-west-2
-    - -listen=/var/run/kmsplugin/socket.sock
+    - --key=arn:aws:kms:us-west-2:111122223333:key/1234abcd-12ab-34cd-56ef-1234567890ab
+    - --region=us-west-2
+    - --listen=/var/run/kmsplugin/socket.sock
     ports:
     - containerPort: 8080
       protocol: TCP
@@ -149,10 +149,10 @@ spec:
     name: aws-encryption-provider
     command:
     - /aws-encryption-provider
-    - -key=arn:aws:kms:us-west-2:111122223333:key/1234abcd-12ab-34cd-56ef-1234567890ab
-    - -region=us-west-2
-    - -listen=/var/run/kmsplugin/socket.sock
-    - -health-port=:8083
+    - --key=arn:aws:kms:us-west-2:111122223333:key/1234abcd-12ab-34cd-56ef-1234567890ab
+    - --region=us-west-2
+    - --listen=/var/run/kmsplugin/socket.sock
+    - --health-port=:8083
     ports:
     - containerPort: 8083
       protocol: TCP
