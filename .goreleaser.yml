@@ -26,6 +26,16 @@ builds:
       - linux
       - windows
       - darwin
+dockers:
+  - image_templates:
+    - syncier/aws-encryption-provider
+    - "syncier/aws-encryption-provider:{{ .Tag }}"
+    binaries:
+    - grpcserver
+    builds:
+    - grpcserver
+    dockerfile: Dockerfile.goreleaser
+
 archives:
   - replacements:
       darwin: Darwin
