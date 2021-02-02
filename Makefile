@@ -5,8 +5,12 @@ TAG?=0.0.1
 .PHONY: lint test build-docker build-server build-client
 
 lint:
+	echo "Verifying go mod tidy"
+	hack/verify-mod-tidy.sh
 	echo "Verifying vendored dependencies"
 	hack/verify-vendor.sh
+	echo "Verifying gofmt"
+	hack/verify-gofmt.sh
 	echo "Verifying linting"
 	hack/verify-golint.sh
 

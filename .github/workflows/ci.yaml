@@ -19,12 +19,6 @@ jobs:
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-
-      - name: Ensure gofmt
-        run: test -z "$(gofmt -s -d cmd pkg)"
-      - name: Ensure go.mod is already tidied
-        run: go mod tidy && git diff --no-patch --exit-code
-      - name: Run unit tests
-        run: go test ./...
       - name: Build with Goreleaser
         uses: goreleaser/goreleaser-action@v2
         with:
