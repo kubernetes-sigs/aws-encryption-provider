@@ -4,17 +4,12 @@ go 1.15
 
 require (
 	github.com/aws/aws-sdk-go v1.31.7
-	github.com/gogo/protobuf v1.2.1 // indirect
-	github.com/golang/protobuf v1.3.2 // indirect
-	github.com/kr/pretty v0.1.0 // indirect
+	github.com/golangci/golangci-lint v1.36.0
 	github.com/prometheus/client_golang v1.0.0
 	github.com/spf13/pflag v1.0.5
-	go.uber.org/zap v0.0.0-20180814183419-67bc79d13d15
-	golang.org/x/sys v0.0.0-20190911201528-7ad0cfa0b7b5 // indirect
-	golang.org/x/text v0.3.2 // indirect
-	golang.org/x/time v0.0.0-20161028155119-f51c12702a4d
+	go.uber.org/zap v1.10.0
+	golang.org/x/time v0.0.0-20190308202827-9d24e82272b4
 	google.golang.org/grpc v1.23.0
-	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 // indirect
 	k8s.io/apiserver v0.0.0-20190515064100-fc28ef5782df
 )
 
