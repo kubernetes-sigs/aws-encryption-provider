@@ -17,4 +17,6 @@ var (
 	APIVersion string = "v1beta1"
 	Runtime    string = "AWSKMS"
 	Version    string = "UNKNOWN"
+	Commit     string = "UNKNOWN"
+	Date       string = "UNKNOWN"
 )
