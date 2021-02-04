@@ -1,0 +1,14 @@
+# Make sure to check the documentation at http://goreleaser.com
+builds:
+  - id: aws-encryption-provider
+    binary: aws-encryption-provider
+    dir: cmd/server
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+    ldflags: -s -w -X sigs.k8s.io/aws-encryption-provider/pkg/version.Version={{.Version}} -X sigs.k8s.io/aws-encryption-provider/pkg/version.Commit={{.Commit}} -X sigs.k8s.io/aws-encryption-provider/pkg/version.Date={{.Date}}
+checksum:
+  name_template: 'checksums.txt'
+changelog:
+  sort: asc
