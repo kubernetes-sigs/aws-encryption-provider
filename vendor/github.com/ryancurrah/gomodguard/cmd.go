@@ -197,7 +197,7 @@ Flags:`
 }
 
 // WriteCheckstyle takes the results and writes them to a checkstyle formated file.
-func WriteCheckstyle(checkstyleFilePath string, results []Result) error {
+func WriteCheckstyle(checkstyleFilePath string, results []Issue) error {
 	check := checkstyle.New()
 
 	for i := range results {

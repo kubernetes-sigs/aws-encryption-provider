@@ -212,17 +212,17 @@ func (f *fumpter) printLength(node ast.Node) int {
 
 // rxCommentDirective covers all common Go comment directives:
 //
-//   //go:        | standard Go directives, like go:noinline
-//   //someword:  | similar to the syntax above, like lint:ignore
-//   //line       | inserted line information for cmd/compile
-//   //export     | to mark cgo funcs for exporting
-//   //extern     | C function declarations for gccgo
-//   //sys(nb)?   | syscall function wrapper prototypes
-//   //nolint     | nolint directive for golangci
+//   //go:         | standard Go directives, like go:noinline
+//   //some-words: | similar to the syntax above, like lint:ignore or go-sumtype:decl
+//   //line        | inserted line information for cmd/compile
+//   //export      | to mark cgo funcs for exporting
+//   //extern      | C function declarations for gccgo
+//   //sys(nb)?    | syscall function wrapper prototypes
+//   //nolint      | nolint directive for golangci
 //
-// Note that the "someword:" matching expects a letter afterward, such as
+// Note that the "some-words:" matching expects a letter afterward, such as
 // "go:generate", to prevent matching false positives like "https://site".
-var rxCommentDirective = regexp.MustCompile(`^([a-z]+:[a-z]+|line\b|export\b|extern\b|sys(nb)?\b|nolint\b)`)
+var rxCommentDirective = regexp.MustCompile(`^([a-z-]+:[a-z]+|line\b|export\b|extern\b|sys(nb)?\b|nolint\b)`)
 
 // visit takes either an ast.Node or a []ast.Stmt.
 func (f *fumpter) applyPre(c *astutil.Cursor) {
@@ -363,20 +363,20 @@ func (f *fumpter) applyPre(c *astutil.Cursor) {
 			break
 		}
 
-		isFuncBody := false
+		var sign *ast.FuncType
 		var cond ast.Expr
 		switch parent := c.Parent().(type) {
 		case *ast.FuncDecl:
-			isFuncBody = true
+			sign = parent.Type
 		case *ast.FuncLit:
-			isFuncBody = true
+			sign = parent.Type
 		case *ast.IfStmt:
 			cond = parent.Cond
 		case *ast.ForStmt:
 			cond = parent.Cond
 		}
 
-		if len(node.List) > 1 && !isFuncBody {
+		if len(node.List) > 1 && sign == nil {
 			// only if we have a single statement, or if
 			// it's a func body.
 			break
@@ -396,13 +396,29 @@ func (f *fumpter) applyPre(c *astutil.Cursor) {
 			}
 		}
 
+		f.removeLinesBetween(bodyEnd, node.Rbrace)
+
 		if cond != nil && f.Line(cond.Pos()) != f.Line(cond.End()) {
 			// The body is preceded by a multi-line condition, so an
 			// empty line can help readability.
-		} else {
-			f.removeLinesBetween(node.Lbrace, bodyPos)
+			return
 		}
-		f.removeLinesBetween(bodyEnd, node.Rbrace)
+		if sign != nil {
+			var lastParam *ast.Field
+			if l := sign.Results; l != nil && len(l.List) > 0 {
+				lastParam = l.List[len(l.List)-1]
+			} else if l := sign.Params; l != nil && len(l.List) > 0 {
+				lastParam = l.List[len(l.List)-1]
+			}
+			endLine := f.Line(sign.End())
+			if lastParam != nil && f.Line(sign.Pos()) != endLine && f.Line(lastParam.Pos()) == endLine {
+				// The body is preceded by a multi-line function
+				// signature, and the empty line helps readability.
+				return
+			}
+		}
+
+		f.removeLinesBetween(node.Lbrace, bodyPos)
 
 	case *ast.CompositeLit:
 		if len(node.Elts) == 0 {
@@ -491,8 +507,10 @@ func (f *fumpter) applyPre(c *astutil.Cursor) {
 		f.stmts(node.Body)
 
 	case *ast.FieldList:
-		if node.NumFields() == 0 {
+		if node.NumFields() == 0 && f.inlineComment(node.Pos()) == nil {
 			// Empty field lists should not contain a newline.
+			// Do not join the two lines if the first has an inline
+			// comment, as that can result in broken formatting.
 			openLine := f.Line(node.Pos())
 			closeLine := f.Line(node.End())
 			f.removeLines(openLine, closeLine)

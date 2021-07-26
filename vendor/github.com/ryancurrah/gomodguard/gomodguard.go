@@ -249,8 +249,8 @@ type Configuration struct {
 	Blocked Blocked `yaml:"blocked"`
 }
 
-// Result represents the result of one error.
-type Result struct {
+// Issue represents the result of one error.
+type Issue struct {
 	FileName   string
 	LineNumber int
 	Position   token.Position
@@ -258,8 +258,8 @@ type Result struct {
 }
 
 // String returns the filename, line
-// number and reason of a Result.
-func (r *Result) String() string {
+// number and reason of a Issue.
+func (r *Issue) String() string {
 	return fmt.Sprintf("%s:%d:1 %s", r.FileName, r.LineNumber, r.Reason)
 }
 
@@ -268,7 +268,6 @@ type Processor struct {
 	Config                    *Configuration
 	Modfile                   *modfile.File
 	blockedModulesFromModFile map[string][]string
-	Result                    []Result
 }
 
 // NewProcessor will create a Processor to lint blocked packages.
@@ -286,7 +285,6 @@ func NewProcessor(config *Configuration) (*Processor, error) {
 	p := &Processor{
 		Config:  config,
 		Modfile: modFile,
-		Result:  []Result{},
 	}
 
 	p.SetBlockedModules()
@@ -296,30 +294,32 @@ func NewProcessor(config *Configuration) (*Processor, error) {
 
 // ProcessFiles takes a string slice with file names (full paths)
 // and lints them.
-func (p *Processor) ProcessFiles(filenames []string) []Result {
+func (p *Processor) ProcessFiles(filenames []string) (issues []Issue) {
 	for _, filename := range filenames {
 		data, err := ioutil.ReadFile(filename)
 		if err != nil {
-			p.Result = append(p.Result, Result{
+			issues = append(issues, Issue{
 				FileName:   filename,
 				LineNumber: 0,
 				Reason:     fmt.Sprintf("unable to read file, file cannot be linted (%s)", err.Error()),
 			})
+
+			continue
 		}
 
-		p.process(filename, data)
+		issues = append(issues, p.process(filename, data)...)
 	}
 
-	return p.Result
+	return issues
 }
 
 // process file imports and add lint error if blocked package is imported.
-func (p *Processor) process(filename string, data []byte) {
+func (p *Processor) process(filename string, data []byte) (issues []Issue) {
 	fileSet := token.NewFileSet()
 
 	file, err := parser.ParseFile(fileSet, filename, data, parser.ParseComments)
 	if err != nil {
-		p.Result = append(p.Result, Result{
+		issues = append(issues, Issue{
 			FileName:   filename,
 			LineNumber: 0,
 			Reason:     fmt.Sprintf("invalid syntax, file cannot be linted (%s)", err.Error()),
@@ -338,22 +338,24 @@ func (p *Processor) process(filename string, data []byte) {
 		}
 
 		for _, blockReason := range blockReasons {
-			p.addError(fileSet, imports[n].Pos(), blockReason)
+			issues = append(issues, p.addError(fileSet, imports[n].Pos(), blockReason))
 		}
 	}
+
+	return issues
 }
 
 // addError adds an error for the file and line number for the current token.Pos
 // with the given reason.
-func (p *Processor) addError(fileset *token.FileSet, pos token.Pos, reason string) {
+func (p *Processor) addError(fileset *token.FileSet, pos token.Pos, reason string) Issue {
 	position := fileset.Position(pos)
 
-	p.Result = append(p.Result, Result{
+	return Issue{
 		FileName:   position.Filename,
 		LineNumber: position.Line,
 		Position:   position,
 		Reason:     reason,
-	})
+	}
 }
 
 // SetBlockedModules determines and sets which modules are blocked by reading

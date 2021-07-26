@@ -125,7 +125,7 @@ func (nom namedOccurrenceMap) addFromAssignment(pass *analysis.Pass, assignment 
 			continue
 		}
 
-		if ident.Name == "_" || ident.Obj == nil {
+		if ident.Name == "_" || ident.Obj == nil || isUnshortenableAssignment(ident.Obj.Decl) {
 			continue
 		}
 
@@ -142,6 +142,27 @@ func (nom namedOccurrenceMap) addFromAssignment(pass *analysis.Pass, assignment 
 			nom[ident.Name] = scopeMarkeredOccurences{scopeMarker: newOcc}
 		}
 	}
+}
+
+func isUnshortenableAssignment(decl interface{}) bool {
+	assign, ok := decl.(*ast.AssignStmt)
+	if !ok {
+		return false
+	}
+
+	for _, el := range assign.Rhs {
+		u, ok := el.(*ast.UnaryExpr)
+		if !ok {
+			continue
+		}
+
+		if u.Op == token.AND {
+			if _, ok := u.X.(*ast.CompositeLit); ok {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func areFlagSettingsSatisfied(pass *analysis.Pass, assignment *ast.AssignStmt, i int) bool {
@@ -172,6 +193,8 @@ func (nom namedOccurrenceMap) addFromCondition(stmt *ast.IfStmt) {
 				nom.addFromIdent(stmt.If, e.X)
 			}
 		}
+	case *ast.Ident:
+		nom.addFromIdent(stmt.If, v)
 	case *ast.CallExpr:
 		for _, a := range v.Args {
 			switch e := a.(type) {
