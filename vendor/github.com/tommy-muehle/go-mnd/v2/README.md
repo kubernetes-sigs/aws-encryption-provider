@@ -20,7 +20,7 @@ A vet analyzer to detect magic numbers.
 This analyzer requires Golang in version >= 1.12 because it's depends on the **go/analysis** API.
 
 ```
-go get -u github.com/tommy-muehle/go-mnd/cmd/mnd
+go get -u github.com/tommy-muehle/go-mnd/v2/cmd/mnd
 ```
 
 ### Github action

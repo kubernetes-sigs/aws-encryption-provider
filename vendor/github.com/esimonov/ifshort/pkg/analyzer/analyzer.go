@@ -101,7 +101,7 @@ func (nom namedOccurrenceMap) checkStatement(stmt ast.Stmt, ifPos token.Pos) {
 		nom.checkStatement(v.Post, ifPos)
 	case *ast.GoStmt:
 		for _, a := range v.Call.Args {
-			nom.checkExpression(a, token.NoPos)
+			nom.checkExpression(a, ifPos)
 		}
 	case *ast.IfStmt:
 		for _, el := range v.Body.List {
@@ -123,17 +123,22 @@ func (nom namedOccurrenceMap) checkStatement(stmt ast.Stmt, ifPos token.Pos) {
 		}
 	case *ast.IncDecStmt:
 		nom.checkExpression(v.X, ifPos)
-
 	case *ast.RangeStmt:
-		nom.checkExpression(v.X, token.NoPos)
+		nom.checkExpression(v.X, ifPos)
+		if v.Body != nil {
+			for _, e := range v.Body.List {
+				nom.checkStatement(e, ifPos)
+			}
+		}
 	case *ast.ReturnStmt:
 		for _, r := range v.Results {
-			nom.checkExpression(r, token.NoPos)
+			nom.checkExpression(r, ifPos)
 		}
 	case *ast.SendStmt:
-		nom.checkExpression(v.Value, token.NoPos)
+		nom.checkExpression(v.Chan, ifPos)
+		nom.checkExpression(v.Value, ifPos)
 	case *ast.SwitchStmt:
-		nom.checkExpression(v.Tag, token.NoPos)
+		nom.checkExpression(v.Tag, ifPos)
 
 		for _, el := range v.Body.List {
 			clauses, ok := el.(*ast.CaseClause)
@@ -144,25 +149,25 @@ func (nom namedOccurrenceMap) checkStatement(stmt ast.Stmt, ifPos token.Pos) {
 			for _, c := range clauses.List {
 				switch v := c.(type) {
 				case *ast.BinaryExpr:
-					nom.checkExpression(v.X, token.NoPos)
-					nom.checkExpression(v.Y, token.NoPos)
+					nom.checkExpression(v.X, ifPos)
+					nom.checkExpression(v.Y, ifPos)
 				case *ast.Ident:
-					nom.checkExpression(v, token.NoPos)
+					nom.checkExpression(v, ifPos)
 				}
 			}
 
 			for _, c := range clauses.Body {
 				if est, ok := c.(*ast.ExprStmt); ok {
-					nom.checkExpression(est.X, token.NoPos)
+					nom.checkExpression(est.X, ifPos)
 				}
 
 				switch v := c.(type) {
 				case *ast.AssignStmt:
 					for _, el := range v.Rhs {
-						nom.checkExpression(el, token.NoPos)
+						nom.checkExpression(el, ifPos)
 					}
 				case *ast.ExprStmt:
-					nom.checkExpression(v.X, token.NoPos)
+					nom.checkExpression(v.X, ifPos)
 				}
 			}
 		}
@@ -173,24 +178,23 @@ func (nom namedOccurrenceMap) checkExpression(candidate ast.Expr, ifPos token.Po
 	switch v := candidate.(type) {
 	case *ast.BinaryExpr:
 		nom.checkExpression(v.X, ifPos)
+		nom.checkExpression(v.Y, ifPos)
 	case *ast.CallExpr:
 		for _, arg := range v.Args {
 			nom.checkExpression(arg, ifPos)
 		}
+		nom.checkExpression(v.Fun, ifPos)
 		if fun, ok := v.Fun.(*ast.SelectorExpr); ok {
 			nom.checkExpression(fun.X, ifPos)
 		}
 	case *ast.CompositeLit:
 		for _, el := range v.Elts {
-			kv, ok := el.(*ast.KeyValueExpr)
-			if !ok {
-				continue
-			}
-			if ident, ok := kv.Key.(*ast.Ident); ok {
-				nom.checkExpression(ident, ifPos)
-			}
-			if ident, ok := kv.Value.(*ast.Ident); ok {
-				nom.checkExpression(ident, ifPos)
+			switch v := el.(type) {
+			case *ast.Ident:
+				nom.checkExpression(v, ifPos)
+			case *ast.KeyValueExpr:
+				nom.checkExpression(v.Key, ifPos)
+				nom.checkExpression(v.Value, ifPos)
 			}
 		}
 	case *ast.FuncLit:
@@ -198,7 +202,7 @@ func (nom namedOccurrenceMap) checkExpression(candidate ast.Expr, ifPos token.Po
 			nom.checkStatement(el, ifPos)
 		}
 	case *ast.Ident:
-		if nom[v.Name].isEmponymousKey(ifPos) {
+		if _, ok := nom[v.Name]; !ok || nom[v.Name].isEmponymousKey(ifPos) {
 			return
 		}
 
@@ -215,14 +219,19 @@ func (nom namedOccurrenceMap) checkExpression(candidate ast.Expr, ifPos token.Po
 		}
 	case *ast.IndexExpr:
 		nom.checkExpression(v.X, ifPos)
-		if index, ok := v.Index.(*ast.BinaryExpr); ok {
+		switch index := v.Index.(type) {
+		case *ast.BinaryExpr:
 			nom.checkExpression(index.X, ifPos)
+		case *ast.Ident:
+			nom.checkExpression(index, ifPos)
 		}
 	case *ast.SelectorExpr:
 		nom.checkExpression(v.X, ifPos)
 	case *ast.SliceExpr:
 		nom.checkExpression(v.High, ifPos)
 		nom.checkExpression(v.Low, ifPos)
+		nom.checkExpression(v.X, ifPos)
+	case *ast.TypeAssertExpr:
 		nom.checkExpression(v.X, ifPos)
 	case *ast.UnaryExpr:
 		nom.checkExpression(v.X, ifPos)

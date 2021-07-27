@@ -15,18 +15,18 @@ func init() {
 	info.Tags = []string{"diagnostic", "experimental"}
 	info.Summary = "Detects redundant type assertions"
 	info.Before = `
-function f(r io.Reader) interface{} {
+func f(r io.Reader) interface{} {
 	return r.(interface{})
 }
 `
 	info.After = `
-function f(r io.Reader) interface{} {
+func f(r io.Reader) interface{} {
 	return r
 }
 `
 
-	collection.AddChecker(&info, func(ctx *linter.CheckerContext) linter.FileWalker {
-		return astwalk.WalkerForExpr(&sloppyTypeAssertChecker{ctx: ctx})
+	collection.AddChecker(&info, func(ctx *linter.CheckerContext) (linter.FileWalker, error) {
+		return astwalk.WalkerForExpr(&sloppyTypeAssertChecker{ctx: ctx}), nil
 	})
 }
 

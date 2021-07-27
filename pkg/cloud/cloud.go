@@ -33,9 +33,15 @@ func New(region, kmsEndpoint string, qps, burst int) (*AWSKMS, error) {
 		CredentialsChainVerboseErrors: aws.Bool(true),
 		Endpoint:                      aws.String(kmsEndpoint),
 	}
+
+	sess, err := session.NewSession()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create new session: %v", err)
+	}
+
 	if qps > 0 {
 		var err error
-		cfg.HTTPClient, err = httputil.NewRateLimitedClient(
+		sess.Config.HTTPClient, err = httputil.NewRateLimitedClient(
 			qps,
 			burst,
 		)
@@ -44,12 +50,7 @@ func New(region, kmsEndpoint string, qps, burst int) (*AWSKMS, error) {
 		}
 	}
 
-	sess, err := session.NewSession(cfg)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create new session: %v", err)
-	}
-
 	return &AWSKMS{
-		kms.New(sess),
+		kms.New(sess, cfg),
 	}, nil
 }

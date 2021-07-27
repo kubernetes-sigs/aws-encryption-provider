@@ -157,6 +157,9 @@ func (v *visitor) recordNonZeroLengthSlices(node ast.Node) {
 	if !ok {
 		return
 	}
+	if ident.Obj == nil {
+		return
+	}
 	v.nonZeroLengthSliceDecls[ident.Obj.Decl] = struct{}{}
 }
 

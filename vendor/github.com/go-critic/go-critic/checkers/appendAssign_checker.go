@@ -24,8 +24,8 @@ p.negatives = append(p.negatives, y)`
 p.positives = append(p.positives, x)
 p.negatives = append(p.negatives, y)`
 
-	collection.AddChecker(&info, func(ctx *linter.CheckerContext) linter.FileWalker {
-		return astwalk.WalkerForStmt(&appendAssignChecker{ctx: ctx})
+	collection.AddChecker(&info, func(ctx *linter.CheckerContext) (linter.FileWalker, error) {
+		return astwalk.WalkerForStmt(&appendAssignChecker{ctx: ctx}), nil
 	})
 }
 
@@ -36,7 +36,7 @@ type appendAssignChecker struct {
 
 func (c *appendAssignChecker) VisitStmt(stmt ast.Stmt) {
 	assign, ok := stmt.(*ast.AssignStmt)
-	if !ok || assign.Tok != token.ASSIGN || len(assign.Lhs) != len(assign.Rhs) {
+	if !ok || (assign.Tok != token.ASSIGN && assign.Tok != token.DEFINE) || len(assign.Lhs) != len(assign.Rhs) {
 		return
 	}
 	for i, rhs := range assign.Rhs {

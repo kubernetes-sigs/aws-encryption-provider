@@ -3,13 +3,14 @@ module sigs.k8s.io/aws-encryption-provider
 go 1.15
 
 require (
-	github.com/aws/aws-sdk-go v1.31.7
-	github.com/golangci/golangci-lint v1.36.0
-	github.com/prometheus/client_golang v1.0.0
+	github.com/aws/aws-sdk-go v1.36.30
+	github.com/golangci/golangci-lint v1.41.1
+	github.com/prometheus/client_golang v1.7.1
 	github.com/spf13/pflag v1.0.5
-	go.uber.org/zap v1.10.0
-	golang.org/x/time v0.0.0-20190308202827-9d24e82272b4
-	google.golang.org/grpc v1.23.0
+	github.com/stretchr/testify v1.7.0
+	go.uber.org/zap v1.13.0
+	golang.org/x/time v0.0.0-20200416051211-89c76fbcd5d1
+	google.golang.org/grpc v1.29.1
 	k8s.io/apiserver v0.0.0-20190515064100-fc28ef5782df
 )
 
