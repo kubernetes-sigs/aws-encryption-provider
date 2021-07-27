@@ -9,7 +9,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM golang:1.15-alpine AS build
+FROM public.ecr.aws/bitnami/golang:1.15 AS build
 RUN apk --no-cache update && \
     apk --no-cache add ca-certificates git && \
     rm -rf /var/cache/apk/*
