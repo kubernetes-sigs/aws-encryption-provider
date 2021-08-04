@@ -17,10 +17,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/aws-sdk-go/service/kms"
 	"go.uber.org/zap"
 	pb "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/v1beta1"
 	"sigs.k8s.io/aws-encryption-provider/pkg/cloud"
@@ -35,41 +38,119 @@ var (
 
 func TestEncrypt(t *testing.T) {
 	tt := []struct {
-		input  string
-		ctx    map[string]string
-		output string
-		err    error
+		input     string
+		ctx       map[string]string
+		output    string
+		err       error
+		errType   KMS_ERROR_TYPE
+		healthErr bool
+		checkErr  bool
 	}{
 		{
-			input:  plainMessage,
-			ctx:    nil,
-			output: encryptedMessage,
-			err:    nil,
+			input:     plainMessage,
+			ctx:       nil,
+			output:    encryptedMessage,
+			err:       nil,
+			errType:   KMS_ERROR_TYPE_NIL,
+			healthErr: false,
+			checkErr:  false,
 		},
 		{
-			input:  plainMessage,
-			ctx:    nil,
-			output: "",
-			err:    errorMessage,
+			input:     plainMessage,
+			ctx:       nil,
+			output:    "",
+			err:       errorMessage,
+			errType:   KMS_ERROR_TYPE_OTHER,
+			healthErr: true,
+			checkErr:  true,
 		},
 		{
-			input:  plainMessage,
-			ctx:    make(map[string]string),
-			output: encryptedMessage,
-			err:    nil,
+			input:     plainMessage,
+			ctx:       nil,
+			output:    "",
+			err:       awserr.New("RequestLimitExceeded", "test", errors.New("fail")),
+			errType:   KMS_ERROR_TYPE_THROTTLED,
+			healthErr: true,
+			checkErr:  true,
 		},
 		{
-			input:  encryptedMessage,
-			ctx:    map[string]string{"a": "b"},
-			output: "",
-			err:    errors.New("invalid context"),
+			input:     plainMessage,
+			ctx:       nil,
+			output:    "",
+			err:       awserr.New(kms.ErrCodeInternalException, "test", errors.New("fail")),
+			errType:   KMS_ERROR_TYPE_OTHER,
+			healthErr: true,
+			checkErr:  true,
+		},
+		{
+			input:     plainMessage,
+			ctx:       nil,
+			output:    "",
+			err:       awserr.New(kms.ErrCodeLimitExceededException, "test", errors.New("fail")),
+			errType:   KMS_ERROR_TYPE_THROTTLED,
+			healthErr: true,
+			checkErr:  true,
+		},
+		{
+			input:     plainMessage,
+			ctx:       nil,
+			output:    "",
+			err:       awserr.New(kms.ErrCodeDisabledException, "test", errors.New("fail")),
+			errType:   KMS_ERROR_TYPE_USER_INDUCED,
+			healthErr: true,
+			checkErr:  false,
+		},
+		{
+			input:     plainMessage,
+			ctx:       nil,
+			output:    "",
+			err:       awserr.New(kms.ErrCodeInvalidStateException, "test", errors.New("fail")),
+			errType:   KMS_ERROR_TYPE_USER_INDUCED,
+			healthErr: true,
+			checkErr:  false,
+		},
+		{
+			input:     plainMessage,
+			ctx:       nil,
+			output:    "",
+			err:       awserr.New(kms.ErrCodeInvalidGrantIdException, "test", errors.New("fail")),
+			errType:   KMS_ERROR_TYPE_USER_INDUCED,
+			healthErr: true,
+			checkErr:  false,
+		},
+		{
+			input:     plainMessage,
+			ctx:       nil,
+			output:    "",
+			err:       awserr.New(kms.ErrCodeInvalidGrantTokenException, "test", errors.New("fail")),
+			errType:   KMS_ERROR_TYPE_USER_INDUCED,
+			healthErr: true,
+			checkErr:  false,
+		},
+		{
+			input:     plainMessage,
+			ctx:       make(map[string]string),
+			output:    encryptedMessage,
+			err:       nil,
+			errType:   KMS_ERROR_TYPE_NIL,
+			healthErr: false,
+			checkErr:  false,
+		},
+		{
+			input:     encryptedMessage,
+			ctx:       map[string]string{"a": "b"},
+			output:    "",
+			err:       errors.New("invalid context"),
+			errType:   KMS_ERROR_TYPE_OTHER,
+			healthErr: true,
+			checkErr:  true,
 		},
 	}
 
 	c := &cloud.KMSMock{}
 	ctx := context.Background()
 
-	for _, tc := range tt {
+	for idx, tc := range tt {
 		func() {
 			c.SetEncryptResp(tc.output, tc.err)
 			p := New(key, c, nil)
@@ -81,15 +162,36 @@ func TestEncrypt(t *testing.T) {
 			eRes, err := p.Encrypt(ctx, eReq)
 
 			if tc.err != nil && err == nil {
-				t.Fatalf("Failed to return expected error %v", tc.err)
+				t.Fatalf("#%d: failed to return expected error %v", idx, tc.err)
 			}
 
 			if tc.err == nil && err != nil {
-				t.Fatalf("Returned unexpected error: %v", err)
+				t.Fatalf("#%d: returned unexpected error: %v", idx, err)
 			}
 
 			if tc.err == nil && string(eRes.Cipher) != StorageVersion+tc.output {
-				t.Fatalf("Expected %s, but got %s", StorageVersion+tc.output, string(eRes.Cipher))
+				t.Fatalf("#%d: expected %s, but got %s", idx, StorageVersion+tc.output, string(eRes.Cipher))
+			}
+
+			et := ParseError(tc.err)
+			if !reflect.DeepEqual(tc.errType, et) {
+				t.Fatalf("#%d: expected error type %s, got %s", idx, tc.errType, et)
+			}
+
+			herr := p.Health()
+			if tc.healthErr && herr == nil {
+				t.Fatalf("#%d: expected health error, but got nil", idx)
+			}
+			if !tc.healthErr && herr != nil {
+				t.Fatalf("#%d: unexpected health error, got %v", idx, herr)
+			}
+
+			cerr := p.Check()
+			if tc.checkErr && cerr == nil {
+				t.Fatalf("#%d: expected check error, but got nil", idx)
+			}
+			if !tc.checkErr && cerr != nil {
+				t.Fatalf("#%d: unexpected check error, got %v", idx, cerr)
 			}
 		}()
 	}

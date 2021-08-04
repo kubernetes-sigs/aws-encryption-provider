@@ -20,6 +20,8 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/aws-sdk-go/aws/request"
 	awsreq "github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/service/kms"
 	"github.com/aws/aws-sdk-go/service/kms/kmsiface"
@@ -164,9 +166,23 @@ func (p *Plugin) Health() error {
 		return err
 	}
 	if err != nil {
-		zap.L().Warn("health check fail", zap.Error(err))
+		zap.L().Warn("health check failed", zap.Error(err))
 	} else {
 		zap.L().Debug("health check success")
+	}
+	return err
+}
+
+// Checks the liveness of KMS API.
+// If the error returned from KMS is user-induced, the function returns nil.
+func (p *Plugin) Check() error {
+	err := p.Health()
+	if err == nil {
+		return nil
+	}
+	et := ParseError(err)
+	if et == KMS_ERROR_TYPE_USER_INDUCED {
+		return nil
 	}
 	return err
 }
@@ -200,11 +216,11 @@ func (p *Plugin) Encrypt(ctx context.Context, request *pb.EncryptRequest) (*pb.E
 		case p.healthCheckErrc <- err:
 		default:
 		}
-		zap.L().Error("request to encrypt failed", zap.Error(err))
+		zap.L().Error("request to encrypt failed", zap.String("error-type", ParseError(err).String()), zap.Error(err))
 		failLabel := getStatusLabel(err)
 		kmsLatencyMetric.WithLabelValues(p.keyID, failLabel, operationEncrypt).Observe(getMillisecondsSince(startTime))
 		kmsOperationCounter.WithLabelValues(p.keyID, failLabel, operationEncrypt).Inc()
-		return nil, fmt.Errorf("failed to encrypt data: %v", err)
+		return nil, err // don't wrap, keep the original error type
 	}
 
 	zap.L().Debug("encrypt operation successful")
@@ -235,11 +251,11 @@ func (p *Plugin) Decrypt(ctx context.Context, request *pb.DecryptRequest) (*pb.D
 		case p.healthCheckErrc <- err:
 		default:
 		}
-		zap.L().Error("request to decrypt failed", zap.Error(err))
+		zap.L().Error("request to decrypt failed", zap.String("error-type", ParseError(err).String()), zap.Error(err))
 		failLabel := getStatusLabel(err)
 		kmsLatencyMetric.WithLabelValues(p.keyID, failLabel, operationDecrypt).Observe(getMillisecondsSince(startTime))
 		kmsOperationCounter.WithLabelValues(p.keyID, failLabel, operationDecrypt).Inc()
-		return nil, fmt.Errorf("failed to decrypt data: %v", err)
+		return nil, err // don't wrap, keep the original error type
 	}
 
 	zap.L().Debug("decrypt operation successful")
@@ -268,16 +284,6 @@ func WaitForReady(client pb.KeyManagementServiceClient, duration time.Duration) 
 	return nil
 }
 
-// Check validates the availability of the server using the provided client
-func Check(client pb.KeyManagementServiceClient) (string, error) {
-	res, err := client.Version(context.Background(), &pb.VersionRequest{})
-	if err != nil {
-		return "", err
-	}
-
-	return res.String(), nil
-}
-
 // NewClient returns a KeyManagementServiceClient for a given grpc connection
 func NewClient(conn *grpc.ClientConn) pb.KeyManagementServiceClient {
 	return pb.NewKeyManagementServiceClient(conn)
@@ -296,4 +302,63 @@ func getStatusLabel(err error) string {
 	default:
 		return statusFailure
 	}
+}
+
+type KMS_ERROR_TYPE int
+
+const (
+	KMS_ERROR_TYPE_NIL = KMS_ERROR_TYPE(iota)
+	KMS_ERROR_TYPE_USER_INDUCED
+	KMS_ERROR_TYPE_THROTTLED
+	KMS_ERROR_TYPE_OTHER
+)
+
+func (t KMS_ERROR_TYPE) String() string {
+	switch t {
+	case KMS_ERROR_TYPE_NIL:
+		return ""
+	case KMS_ERROR_TYPE_USER_INDUCED:
+		return "user-induced"
+	case KMS_ERROR_TYPE_THROTTLED:
+		return "throttled"
+	case KMS_ERROR_TYPE_OTHER:
+		return "other"
+	default:
+		return ""
+	}
+}
+
+// ParseError parses error codes from KMS
+// ref. https://docs.aws.amazon.com/kms/latest/developerguide/key-state.html
+// ref. https://docs.aws.amazon.com/sdk-for-go/api/service/kms/
+func ParseError(err error) (errorType KMS_ERROR_TYPE) {
+	if err == nil {
+		return KMS_ERROR_TYPE_NIL
+	}
+	ev, ok := err.(awserr.Error)
+	if !ok {
+		return KMS_ERROR_TYPE_OTHER
+	}
+	zap.L().Debug("parsed error", zap.String("code", ev.Code()), zap.String("message", ev.Message()))
+	if request.IsErrorThrottle(err) {
+		return KMS_ERROR_TYPE_THROTTLED
+	}
+	switch ev.Code() {
+	// CMK is disabled or pending deletion
+	case kms.ErrCodeDisabledException,
+		kms.ErrCodeInvalidStateException:
+		return KMS_ERROR_TYPE_USER_INDUCED
+
+	// CMK does not exist, or grant is not valid
+	case kms.ErrCodeKeyUnavailableException,
+		kms.ErrCodeInvalidArnException,
+		kms.ErrCodeInvalidGrantIdException,
+		kms.ErrCodeInvalidGrantTokenException:
+		return KMS_ERROR_TYPE_USER_INDUCED
+
+	// ref. https://docs.aws.amazon.com/kms/latest/developerguide/requests-per-second.html
+	case kms.ErrCodeLimitExceededException:
+		return KMS_ERROR_TYPE_THROTTLED
+	}
+	return KMS_ERROR_TYPE_OTHER
 }
