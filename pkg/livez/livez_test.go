@@ -1,4 +1,4 @@
-package healthz
+package livez
 
 import (
 	"errors"
@@ -20,8 +20,8 @@ import (
 	"sigs.k8s.io/aws-encryption-provider/pkg/server"
 )
 
-// TestHealthz tests healthz handlers.
-func TestHealthz(t *testing.T) {
+// TestLivez tests livez handlers.
+func TestLivez(t *testing.T) {
 	zap.ReplaceGlobals(zap.NewExample())
 
 	tt := []struct {
@@ -30,36 +30,36 @@ func TestHealthz(t *testing.T) {
 		shouldSucceed bool
 	}{
 		{
-			path:          "/test-healthz-default",
+			path:          "/test-livez-default",
 			kmsEncryptErr: nil,
 			shouldSucceed: true,
 		},
 		{
-			path:          "/test-healthz-fail",
+			path:          "/test-livez-fail",
 			kmsEncryptErr: errors.New("fail encrypt"),
 			shouldSucceed: false,
 		},
-
 		{
-			path:          "/test-healthz-fail-with-internal-error",
+			path:          "/test-livez-fail-with-internal-error",
 			kmsEncryptErr: awserr.New(kms.ErrCodeInternalException, "test", errors.New("fail")),
 			shouldSucceed: false,
 		},
-		// user-induced errors should still fail "/healthz"
+
+		// user-induced
 		{
-			path:          "/test-healthz-fail-with-user-induced-invalid-key-state",
+			path:          "/test-livez-fail-with-user-induced-invalid-key-state",
 			kmsEncryptErr: awserr.New(kms.ErrCodeInvalidStateException, "test", errors.New("fail")),
-			shouldSucceed: false,
+			shouldSucceed: true,
 		},
 		{
-			path:          "/test-healthz-fail-with-user-induced-invalid-grant",
+			path:          "/test-livez-fail-with-user-induced-invalid-grant",
 			kmsEncryptErr: awserr.New(kms.ErrCodeInvalidGrantTokenException, "test", errors.New("fail")),
-			shouldSucceed: false,
+			shouldSucceed: true,
 		},
 	}
 	for i, entry := range tt {
 		t.Run(entry.path, func(t *testing.T) {
-			addr := filepath.Join(os.TempDir(), fmt.Sprintf("healthz%x", rand.Int63()))
+			addr := filepath.Join(os.TempDir(), fmt.Sprintf("livez%x", rand.Int63()))
 			defer os.RemoveAll(addr)
 
 			c := &cloud.KMSMock{}

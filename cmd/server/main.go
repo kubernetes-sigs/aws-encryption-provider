@@ -26,6 +26,7 @@ import (
 	"go.uber.org/zap/zapcore"
 	"sigs.k8s.io/aws-encryption-provider/pkg/cloud"
 	"sigs.k8s.io/aws-encryption-provider/pkg/healthz"
+	"sigs.k8s.io/aws-encryption-provider/pkg/livez"
 	"sigs.k8s.io/aws-encryption-provider/pkg/logging"
 	"sigs.k8s.io/aws-encryption-provider/pkg/plugin"
 	"sigs.k8s.io/aws-encryption-provider/pkg/server"
@@ -33,8 +34,9 @@ import (
 
 func main() {
 	var (
-		healthzPath   = flag.String("healthz-path", "/healthz", "healthcheck path")
-		healthzPort   = flag.String("health-port", ":8080", "healthcheck port")
+		healthPort    = flag.String("health-port", ":8080", "port to serve /healthz and /livez")
+		healthzPath   = flag.String("healthz-path", "/healthz", "deep health check path")
+		livezPath     = flag.String("livez-path", "/livez", "liveness/connectivity check path")
 		addr          = flag.String("listen", "/var/run/kmsplugin/socket.sock", "GRPC listen address")
 		key           = flag.String("key", "", "AWS KMS Key")
 		region        = flag.String("region", "us-east-1", "AWS Region")
@@ -60,8 +62,9 @@ func main() {
 	zap.ReplaceGlobals(l)
 
 	zap.L().Info("creating kms server",
+		zap.String("health-port", *healthPort),
 		zap.String("healthz-path", *healthzPath),
-		zap.String("healthz-port", *healthzPort),
+		zap.String("livez-path", *livezPath),
 		zap.String("region", *region),
 		zap.String("listen-address", *addr),
 		zap.String("kms-endpoint", *kmsEndpoint),
@@ -83,8 +86,9 @@ func main() {
 	p.Register(s.Server)
 	go func() {
 		http.Handle(*healthzPath, healthz.NewHandler(p))
+		http.Handle(*livezPath, livez.NewHandler(p))
 		http.Handle("/metrics", promhttp.Handler())
-		if err := http.ListenAndServe(*healthzPort, nil); err != nil {
+		if err := http.ListenAndServe(*healthPort, nil); err != nil {
 			zap.L().Fatal("Failed to start healthcheck server", zap.Error(err))
 		}
 	}()
@@ -95,7 +99,7 @@ func main() {
 		}
 	}()
 
-	zap.L().Info("Healthchecks server started", zap.String("port", *healthzPort))
+	zap.L().Info("Healthchecks server started", zap.String("port", *healthPort))
 	zap.L().Info("Plugin server started", zap.String("port", *addr))
 
 	signals := make(chan os.Signal, 1)

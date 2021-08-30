@@ -15,11 +15,14 @@ package plugin
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/aws-sdk-go/aws/request"
 	awsreq "github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/service/kms"
 	"github.com/aws/aws-sdk-go/service/kms/kmsiface"
@@ -28,6 +31,73 @@ import (
 	pb "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/v1beta1"
 	"sigs.k8s.io/aws-encryption-provider/pkg/version"
 )
+
+type KMSErrorType int
+
+const (
+	KMSErrorTypeNil = KMSErrorType(iota)
+	KMSErrorTypeUserInduced
+	KMSErrorTypeThrottled
+	KMSErrorTypeOther
+)
+
+func (t KMSErrorType) String() string {
+	switch t {
+	case KMSErrorTypeNil:
+		return ""
+	case KMSErrorTypeUserInduced:
+		return "user-induced"
+	case KMSErrorTypeThrottled:
+		return "throttled"
+	case KMSErrorTypeOther:
+		return "other"
+	default:
+		return ""
+	}
+}
+
+// ParseError parses error codes from KMS
+// ref. https://docs.aws.amazon.com/kms/latest/developerguide/key-state.html
+// ref. https://docs.aws.amazon.com/sdk-for-go/api/service/kms/
+func ParseError(err error) (errorType KMSErrorType) {
+	if err == nil {
+		return KMSErrorTypeNil
+	}
+
+	uerr := errors.Unwrap(err)
+	if uerr == nil {
+		// in case the error was not wrapped,
+		// preserve the original error type
+		uerr = err
+	}
+
+	ev, ok := uerr.(awserr.Error)
+	if !ok {
+		return KMSErrorTypeOther
+	}
+	zap.L().Debug("parsed error", zap.String("code", ev.Code()), zap.String("message", ev.Message()))
+	if request.IsErrorThrottle(uerr) {
+		return KMSErrorTypeThrottled
+	}
+	switch ev.Code() {
+	// CMK is disabled or pending deletion
+	case kms.ErrCodeDisabledException,
+		kms.ErrCodeInvalidStateException:
+		return KMSErrorTypeUserInduced
+
+	// CMK does not exist, or grant is not valid
+	case kms.ErrCodeKeyUnavailableException,
+		kms.ErrCodeInvalidArnException,
+		kms.ErrCodeInvalidGrantIdException,
+		kms.ErrCodeInvalidGrantTokenException:
+		return KMSErrorTypeUserInduced
+
+	// ref. https://docs.aws.amazon.com/kms/latest/developerguide/requests-per-second.html
+	case kms.ErrCodeLimitExceededException:
+		return KMSErrorTypeThrottled
+	}
+	return KMSErrorTypeOther
+}
 
 const (
 	statusSuccess         = "success"
@@ -164,11 +234,21 @@ func (p *Plugin) Health() error {
 		return err
 	}
 	if err != nil {
-		zap.L().Warn("health check fail", zap.Error(err))
+		zap.L().Warn("health check failed", zap.Error(err))
 	} else {
 		zap.L().Debug("health check success")
 	}
 	return err
+}
+
+// Live checks the liveness of KMS API.
+// If the error is user-induced (e.g., revoke CMK), the function returns NO error.
+// If the error is due to KMS availability, the function returns the error.
+func (p *Plugin) Live() error {
+	if err := p.Health(); err != nil && ParseError(err) != KMSErrorTypeUserInduced {
+		return err
+	}
+	return nil
 }
 
 // Version returns the plugin server version
@@ -200,11 +280,11 @@ func (p *Plugin) Encrypt(ctx context.Context, request *pb.EncryptRequest) (*pb.E
 		case p.healthCheckErrc <- err:
 		default:
 		}
-		zap.L().Error("request to encrypt failed", zap.Error(err))
+		zap.L().Error("request to encrypt failed", zap.String("error-type", ParseError(err).String()), zap.Error(err))
 		failLabel := getStatusLabel(err)
 		kmsLatencyMetric.WithLabelValues(p.keyID, failLabel, operationEncrypt).Observe(getMillisecondsSince(startTime))
 		kmsOperationCounter.WithLabelValues(p.keyID, failLabel, operationEncrypt).Inc()
-		return nil, fmt.Errorf("failed to encrypt data: %v", err)
+		return nil, fmt.Errorf("failed to encrypt %w", err)
 	}
 
 	zap.L().Debug("encrypt operation successful")
@@ -235,11 +315,11 @@ func (p *Plugin) Decrypt(ctx context.Context, request *pb.DecryptRequest) (*pb.D
 		case p.healthCheckErrc <- err:
 		default:
 		}
-		zap.L().Error("request to decrypt failed", zap.Error(err))
+		zap.L().Error("request to decrypt failed", zap.String("error-type", ParseError(err).String()), zap.Error(err))
 		failLabel := getStatusLabel(err)
 		kmsLatencyMetric.WithLabelValues(p.keyID, failLabel, operationDecrypt).Observe(getMillisecondsSince(startTime))
 		kmsOperationCounter.WithLabelValues(p.keyID, failLabel, operationDecrypt).Inc()
-		return nil, fmt.Errorf("failed to decrypt data: %v", err)
+		return nil, fmt.Errorf("failed to decrypt %w", err)
 	}
 
 	zap.L().Debug("decrypt operation successful")
@@ -266,16 +346,6 @@ func WaitForReady(client pb.KeyManagementServiceClient, duration time.Duration) 
 	}
 
 	return nil
-}
-
-// Check validates the availability of the server using the provided client
-func Check(client pb.KeyManagementServiceClient) (string, error) {
-	res, err := client.Version(context.Background(), &pb.VersionRequest{})
-	if err != nil {
-		return "", err
-	}
-
-	return res.String(), nil
 }
 
 // NewClient returns a KeyManagementServiceClient for a given grpc connection

@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -42,16 +43,10 @@ func TestMetrics(t *testing.T) {
 		},
 	}
 	for i, entry := range tt {
-		func() {
-			// create temporary unix socket file
-			f, err := ioutil.TempFile(os.TempDir(), fmt.Sprintf("%x", rand.Int63()))
-			if err != nil {
-				t.Fatal(err)
-			}
-			addr := f.Name()
-			f.Close()
-			os.RemoveAll(addr)
+		t.Run(entry.key, func(t *testing.T) {
+			addr := filepath.Join(os.TempDir(), fmt.Sprintf("metrics%x", rand.Int63()))
 			defer os.RemoveAll(addr)
+
 			c := &cloud.KMSMock{}
 			c.SetEncryptResp("test", entry.encryptErr)
 
@@ -87,7 +82,7 @@ func TestMetrics(t *testing.T) {
 
 			u := ts.URL + "/metrics"
 
-			_, err = p.Encrypt(context.Background(), &pb.EncryptRequest{Plain: []byte("hello")})
+			_, err := p.Encrypt(context.Background(), &pb.EncryptRequest{Plain: []byte("hello")})
 			if err != nil {
 				if entry.encryptErr == nil {
 					t.Fatal(err)
@@ -109,6 +104,6 @@ func TestMetrics(t *testing.T) {
 			if !strings.Contains(string(d), entry.expects) {
 				t.Fatalf("#%d: expected %q, got\n\n%s\n\n", i, entry.expects, string(d))
 			}
-		}()
+		})
 	}
 }
