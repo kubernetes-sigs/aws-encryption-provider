@@ -43,7 +43,7 @@ func TestMetrics(t *testing.T) {
 		},
 	}
 	for i, entry := range tt {
-		func() {
+		t.Run(entry.key, func(t *testing.T) {
 			addr := filepath.Join(os.TempDir(), fmt.Sprintf("metrics%x", rand.Int63()))
 			defer os.RemoveAll(addr)
 
@@ -104,6 +104,6 @@ func TestMetrics(t *testing.T) {
 			if !strings.Contains(string(d), entry.expects) {
 				t.Fatalf("#%d: expected %q, got\n\n%s\n\n", i, entry.expects, string(d))
 			}
-		}()
+		})
 	}
 }

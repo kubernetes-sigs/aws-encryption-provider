@@ -58,7 +58,7 @@ func TestHealthz(t *testing.T) {
 		},
 	}
 	for i, entry := range tt {
-		func() {
+		t.Run(entry.path, func(t *testing.T) {
 			addr := filepath.Join(os.TempDir(), fmt.Sprintf("healthz%x", rand.Int63()))
 			defer os.RemoveAll(addr)
 
@@ -115,6 +115,6 @@ func TestHealthz(t *testing.T) {
 			if !entry.shouldSucceed && string(d) == "Internal Server Error" {
 				t.Fatalf("#%d: expected 500 Internal Server Error, got %q", i, string(d))
 			}
-		}()
+		})
 	}
 }
