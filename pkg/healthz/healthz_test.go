@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -58,15 +59,9 @@ func TestHealthz(t *testing.T) {
 	}
 	for i, entry := range tt {
 		func() {
-			// create temporary unix socket file
-			f, err := ioutil.TempFile(os.TempDir(), fmt.Sprintf("%x", rand.Int63()))
-			if err != nil {
-				t.Fatal(err)
-			}
-			addr := f.Name()
-			f.Close()
-			os.RemoveAll(addr)
+			addr := filepath.Join(os.TempDir(), fmt.Sprintf("healthz%x", rand.Int63()))
 			defer os.RemoveAll(addr)
+
 			c := &cloud.KMSMock{}
 			c.SetEncryptResp("test", entry.kmsEncryptErr)
 

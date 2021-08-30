@@ -42,7 +42,7 @@ func TestEncrypt(t *testing.T) {
 		ctx       map[string]string
 		output    string
 		err       error
-		errType   KMS_ERROR_TYPE
+		errType   KMSErrorType
 		healthErr bool
 		checkErr  bool
 	}{
@@ -51,7 +51,7 @@ func TestEncrypt(t *testing.T) {
 			ctx:       nil,
 			output:    encryptedMessage,
 			err:       nil,
-			errType:   KMS_ERROR_TYPE_NIL,
+			errType:   KMSErrorTypeNil,
 			healthErr: false,
 			checkErr:  false,
 		},
@@ -60,7 +60,7 @@ func TestEncrypt(t *testing.T) {
 			ctx:       nil,
 			output:    "",
 			err:       errorMessage,
-			errType:   KMS_ERROR_TYPE_OTHER,
+			errType:   KMSErrorTypeOther,
 			healthErr: true,
 			checkErr:  true,
 		},
@@ -69,7 +69,7 @@ func TestEncrypt(t *testing.T) {
 			ctx:       nil,
 			output:    "",
 			err:       awserr.New("RequestLimitExceeded", "test", errors.New("fail")),
-			errType:   KMS_ERROR_TYPE_THROTTLED,
+			errType:   KMSErrorTypeThrottled,
 			healthErr: true,
 			checkErr:  true,
 		},
@@ -78,7 +78,7 @@ func TestEncrypt(t *testing.T) {
 			ctx:       nil,
 			output:    "",
 			err:       awserr.New(kms.ErrCodeInternalException, "test", errors.New("fail")),
-			errType:   KMS_ERROR_TYPE_OTHER,
+			errType:   KMSErrorTypeOther,
 			healthErr: true,
 			checkErr:  true,
 		},
@@ -87,7 +87,7 @@ func TestEncrypt(t *testing.T) {
 			ctx:       nil,
 			output:    "",
 			err:       awserr.New(kms.ErrCodeLimitExceededException, "test", errors.New("fail")),
-			errType:   KMS_ERROR_TYPE_THROTTLED,
+			errType:   KMSErrorTypeThrottled,
 			healthErr: true,
 			checkErr:  true,
 		},
@@ -96,7 +96,7 @@ func TestEncrypt(t *testing.T) {
 			ctx:       nil,
 			output:    "",
 			err:       awserr.New(kms.ErrCodeDisabledException, "test", errors.New("fail")),
-			errType:   KMS_ERROR_TYPE_USER_INDUCED,
+			errType:   KMSErrorTypeUserInduced,
 			healthErr: true,
 			checkErr:  false,
 		},
@@ -105,7 +105,7 @@ func TestEncrypt(t *testing.T) {
 			ctx:       nil,
 			output:    "",
 			err:       awserr.New(kms.ErrCodeInvalidStateException, "test", errors.New("fail")),
-			errType:   KMS_ERROR_TYPE_USER_INDUCED,
+			errType:   KMSErrorTypeUserInduced,
 			healthErr: true,
 			checkErr:  false,
 		},
@@ -114,7 +114,7 @@ func TestEncrypt(t *testing.T) {
 			ctx:       nil,
 			output:    "",
 			err:       awserr.New(kms.ErrCodeInvalidGrantIdException, "test", errors.New("fail")),
-			errType:   KMS_ERROR_TYPE_USER_INDUCED,
+			errType:   KMSErrorTypeUserInduced,
 			healthErr: true,
 			checkErr:  false,
 		},
@@ -123,7 +123,7 @@ func TestEncrypt(t *testing.T) {
 			ctx:       nil,
 			output:    "",
 			err:       awserr.New(kms.ErrCodeInvalidGrantTokenException, "test", errors.New("fail")),
-			errType:   KMS_ERROR_TYPE_USER_INDUCED,
+			errType:   KMSErrorTypeUserInduced,
 			healthErr: true,
 			checkErr:  false,
 		},
@@ -132,7 +132,7 @@ func TestEncrypt(t *testing.T) {
 			ctx:       make(map[string]string),
 			output:    encryptedMessage,
 			err:       nil,
-			errType:   KMS_ERROR_TYPE_NIL,
+			errType:   KMSErrorTypeNil,
 			healthErr: false,
 			checkErr:  false,
 		},
@@ -141,7 +141,7 @@ func TestEncrypt(t *testing.T) {
 			ctx:       map[string]string{"a": "b"},
 			output:    "",
 			err:       errors.New("invalid context"),
-			errType:   KMS_ERROR_TYPE_OTHER,
+			errType:   KMSErrorTypeOther,
 			healthErr: true,
 			checkErr:  true,
 		},
@@ -186,7 +186,7 @@ func TestEncrypt(t *testing.T) {
 				t.Fatalf("#%d: unexpected health error, got %v", idx, herr)
 			}
 
-			cerr := p.Check()
+			cerr := p.Live()
 			if tc.checkErr && cerr == nil {
 				t.Fatalf("#%d: expected check error, but got nil", idx)
 			}

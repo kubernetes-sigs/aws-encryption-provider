@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"go.uber.org/zap"
 	"sigs.k8s.io/aws-encryption-provider/pkg/plugin"
 )
 
@@ -22,8 +23,10 @@ func (hd *handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		rw.WriteHeader(http.StatusInternalServerError)
 		fmt.Fprint(rw, err)
+		zap.L().Error("health check failed", zap.Error(err))
 		return
 	}
 	rw.WriteHeader(http.StatusOK)
 	fmt.Fprint(rw, http.StatusText(http.StatusOK))
+	zap.L().Debug("health check success")
 }

@@ -15,6 +15,7 @@ package plugin
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -30,6 +31,73 @@ import (
 	pb "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/v1beta1"
 	"sigs.k8s.io/aws-encryption-provider/pkg/version"
 )
+
+type KMSErrorType int
+
+const (
+	KMSErrorTypeNil = KMSErrorType(iota)
+	KMSErrorTypeUserInduced
+	KMSErrorTypeThrottled
+	KMSErrorTypeOther
+)
+
+func (t KMSErrorType) String() string {
+	switch t {
+	case KMSErrorTypeNil:
+		return ""
+	case KMSErrorTypeUserInduced:
+		return "user-induced"
+	case KMSErrorTypeThrottled:
+		return "throttled"
+	case KMSErrorTypeOther:
+		return "other"
+	default:
+		return ""
+	}
+}
+
+// ParseError parses error codes from KMS
+// ref. https://docs.aws.amazon.com/kms/latest/developerguide/key-state.html
+// ref. https://docs.aws.amazon.com/sdk-for-go/api/service/kms/
+func ParseError(err error) (errorType KMSErrorType) {
+	if err == nil {
+		return KMSErrorTypeNil
+	}
+
+	uerr := errors.Unwrap(err)
+	if uerr == nil {
+		// in case the error was not wrapped,
+		// preserve the original error type
+		uerr = err
+	}
+
+	ev, ok := uerr.(awserr.Error)
+	if !ok {
+		return KMSErrorTypeOther
+	}
+	zap.L().Debug("parsed error", zap.String("code", ev.Code()), zap.String("message", ev.Message()))
+	if request.IsErrorThrottle(uerr) {
+		return KMSErrorTypeThrottled
+	}
+	switch ev.Code() {
+	// CMK is disabled or pending deletion
+	case kms.ErrCodeDisabledException,
+		kms.ErrCodeInvalidStateException:
+		return KMSErrorTypeUserInduced
+
+	// CMK does not exist, or grant is not valid
+	case kms.ErrCodeKeyUnavailableException,
+		kms.ErrCodeInvalidArnException,
+		kms.ErrCodeInvalidGrantIdException,
+		kms.ErrCodeInvalidGrantTokenException:
+		return KMSErrorTypeUserInduced
+
+	// ref. https://docs.aws.amazon.com/kms/latest/developerguide/requests-per-second.html
+	case kms.ErrCodeLimitExceededException:
+		return KMSErrorTypeThrottled
+	}
+	return KMSErrorTypeOther
+}
 
 const (
 	statusSuccess         = "success"
@@ -173,18 +241,14 @@ func (p *Plugin) Health() error {
 	return err
 }
 
-// Checks the liveness of KMS API.
-// If the error returned from KMS is user-induced, the function returns nil.
-func (p *Plugin) Check() error {
-	err := p.Health()
-	if err == nil {
-		return nil
+// Live checks the liveness of KMS API.
+// If the error is user-induced (e.g., revoke CMK), the function returns NO error.
+// If the error is due to KMS availability, the function returns the error.
+func (p *Plugin) Live() error {
+	if err := p.Health(); err != nil && ParseError(err) != KMSErrorTypeUserInduced {
+		return err
 	}
-	et := ParseError(err)
-	if et == KMS_ERROR_TYPE_USER_INDUCED {
-		return nil
-	}
-	return err
+	return nil
 }
 
 // Version returns the plugin server version
@@ -220,7 +284,7 @@ func (p *Plugin) Encrypt(ctx context.Context, request *pb.EncryptRequest) (*pb.E
 		failLabel := getStatusLabel(err)
 		kmsLatencyMetric.WithLabelValues(p.keyID, failLabel, operationEncrypt).Observe(getMillisecondsSince(startTime))
 		kmsOperationCounter.WithLabelValues(p.keyID, failLabel, operationEncrypt).Inc()
-		return nil, err // don't wrap, keep the original error type
+		return nil, fmt.Errorf("failed to encrypt %w", err)
 	}
 
 	zap.L().Debug("encrypt operation successful")
@@ -255,7 +319,7 @@ func (p *Plugin) Decrypt(ctx context.Context, request *pb.DecryptRequest) (*pb.D
 		failLabel := getStatusLabel(err)
 		kmsLatencyMetric.WithLabelValues(p.keyID, failLabel, operationDecrypt).Observe(getMillisecondsSince(startTime))
 		kmsOperationCounter.WithLabelValues(p.keyID, failLabel, operationDecrypt).Inc()
-		return nil, err // don't wrap, keep the original error type
+		return nil, fmt.Errorf("failed to decrypt %w", err)
 	}
 
 	zap.L().Debug("decrypt operation successful")
@@ -302,63 +366,4 @@ func getStatusLabel(err error) string {
 	default:
 		return statusFailure
 	}
-}
-
-type KMS_ERROR_TYPE int
-
-const (
-	KMS_ERROR_TYPE_NIL = KMS_ERROR_TYPE(iota)
-	KMS_ERROR_TYPE_USER_INDUCED
-	KMS_ERROR_TYPE_THROTTLED
-	KMS_ERROR_TYPE_OTHER
-)
-
-func (t KMS_ERROR_TYPE) String() string {
-	switch t {
-	case KMS_ERROR_TYPE_NIL:
-		return ""
-	case KMS_ERROR_TYPE_USER_INDUCED:
-		return "user-induced"
-	case KMS_ERROR_TYPE_THROTTLED:
-		return "throttled"
-	case KMS_ERROR_TYPE_OTHER:
-		return "other"
-	default:
-		return ""
-	}
-}
-
-// ParseError parses error codes from KMS
-// ref. https://docs.aws.amazon.com/kms/latest/developerguide/key-state.html
-// ref. https://docs.aws.amazon.com/sdk-for-go/api/service/kms/
-func ParseError(err error) (errorType KMS_ERROR_TYPE) {
-	if err == nil {
-		return KMS_ERROR_TYPE_NIL
-	}
-	ev, ok := err.(awserr.Error)
-	if !ok {
-		return KMS_ERROR_TYPE_OTHER
-	}
-	zap.L().Debug("parsed error", zap.String("code", ev.Code()), zap.String("message", ev.Message()))
-	if request.IsErrorThrottle(err) {
-		return KMS_ERROR_TYPE_THROTTLED
-	}
-	switch ev.Code() {
-	// CMK is disabled or pending deletion
-	case kms.ErrCodeDisabledException,
-		kms.ErrCodeInvalidStateException:
-		return KMS_ERROR_TYPE_USER_INDUCED
-
-	// CMK does not exist, or grant is not valid
-	case kms.ErrCodeKeyUnavailableException,
-		kms.ErrCodeInvalidArnException,
-		kms.ErrCodeInvalidGrantIdException,
-		kms.ErrCodeInvalidGrantTokenException:
-		return KMS_ERROR_TYPE_USER_INDUCED
-
-	// ref. https://docs.aws.amazon.com/kms/latest/developerguide/requests-per-second.html
-	case kms.ErrCodeLimitExceededException:
-		return KMS_ERROR_TYPE_THROTTLED
-	}
-	return KMS_ERROR_TYPE_OTHER
 }
