@@ -17,6 +17,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -75,6 +76,7 @@ func ParseError(err error) (errorType KMSErrorType) {
 	if !ok {
 		return KMSErrorTypeOther
 	}
+
 	zap.L().Debug("parsed error", zap.String("code", ev.Code()), zap.String("message", ev.Message()))
 	if request.IsErrorThrottle(uerr) {
 		return KMSErrorTypeThrottled
@@ -95,7 +97,20 @@ func ParseError(err error) (errorType KMSErrorType) {
 	// ref. https://docs.aws.amazon.com/kms/latest/developerguide/requests-per-second.html
 	case kms.ErrCodeLimitExceededException:
 		return KMSErrorTypeThrottled
+
+	// AWS SDK Go for KMS does not "yet" define specific error code for a case where a customer specifies the deleted key
+	// "AccessDeniedException" error code may be returned when (1) CMK does not exist (not pending delete),
+	// or (2) corresponding IAM role is not allowed to access the key.
+	// Thus we only want to mark "AccessDeniedException" as user-induced for the case (1).
+	// e.g., "AccessDeniedException: The ciphertext refers to a customer master key that does not exist, does not exist in this region, or you are not allowed to access."
+	// KMS service may change the error message, so we do the string match.
+	case "AccessDeniedException":
+		if strings.Contains(ev.Message(), "customer master key that does not exist") ||
+			strings.Contains(ev.Message(), "does not exist in this region") {
+			return KMSErrorTypeUserInduced
+		}
 	}
+
 	return KMSErrorTypeOther
 }
 
