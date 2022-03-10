@@ -39,24 +39,15 @@ func New(region, kmsEndpoint string, qps, burst int) (*AWSKMS, error) {
 			return nil, fmt.Errorf("failed to call the metadata server's region API, %v", err)
 		}
 	}
-	sess.Config.Region = aws.String(region)
 	cfg := &aws.Config{
 		Region:                        aws.String(region),
 		CredentialsChainVerboseErrors: aws.Bool(true),
 		Endpoint:                      aws.String(kmsEndpoint),
 	}
 	if qps > 0 {
-		var err error
-		sess.Config.HTTPClient, err = httputil.NewRateLimitedClient(
-			qps,
-			burst,
-		)
-		if err != nil {
+		if sess.Config.HTTPClient, err = httputil.NewRateLimitedClient(qps, burst); err != nil {
 			return nil, err
 		}
 	}
-
-	return &AWSKMS{
-		kms.New(sess, cfg),
-	}, nil
+	return &AWSKMS{kms.New(sess, cfg)}, nil
 }
