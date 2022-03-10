@@ -17,6 +17,7 @@ import (
 	"fmt"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/ec2metadata"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/kms"
 	"github.com/aws/aws-sdk-go/service/kms/kmsiface"
@@ -28,29 +29,25 @@ type AWSKMS struct {
 }
 
 func New(region, kmsEndpoint string, qps, burst int) (*AWSKMS, error) {
+	sess, err := session.NewSession()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create new session: %w", err)
+	}
+	if region == "" {
+		region, err = ec2metadata.New(sess).Region()
+		if err != nil {
+			return nil, fmt.Errorf("failed to call the metadata server's region API, %v", err)
+		}
+	}
 	cfg := &aws.Config{
 		Region:                        aws.String(region),
 		CredentialsChainVerboseErrors: aws.Bool(true),
 		Endpoint:                      aws.String(kmsEndpoint),
 	}
-
-	sess, err := session.NewSession()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create new session: %v", err)
-	}
-
 	if qps > 0 {
-		var err error
-		sess.Config.HTTPClient, err = httputil.NewRateLimitedClient(
-			qps,
-			burst,
-		)
-		if err != nil {
+		if sess.Config.HTTPClient, err = httputil.NewRateLimitedClient(qps, burst); err != nil {
 			return nil, err
 		}
 	}
-
-	return &AWSKMS{
-		kms.New(sess, cfg),
-	}, nil
+	return &AWSKMS{kms.New(sess, cfg)}, nil
 }
