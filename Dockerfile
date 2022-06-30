@@ -8,11 +8,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+FROM public.ecr.aws/eks-distro/kubernetes/go-runner:v0.13.0-eks-1-23-1 as go-runner
 
-FROM golang:1.15-alpine AS build
-RUN apk --no-cache update && \
-    apk --no-cache add ca-certificates git && \
-    rm -rf /var/cache/apk/*
+FROM public.ecr.aws/bitnami/golang:latest AS build
 WORKDIR /go/src/sigs.k8s.io/aws-encryption-provider
 ARG TAG
 COPY . ./
@@ -21,7 +19,7 @@ RUN	CGO_ENABLED=0 GOOS=linux go build -mod vendor -ldflags \
     "-w -s -X sigs.k8s.io/aws-encryption-provider/pkg/version.Version=$TAG" \
     -o bin/aws-encryption-provider cmd/server/main.go
 
-FROM busybox AS aws-encryption-provider
-COPY --from=build /etc/ssl/certs/ /etc/ssl/certs/
+FROM public.ecr.aws/eks-distro-build-tooling/eks-distro-minimal-base:latest
 COPY --from=build /go/src/sigs.k8s.io/aws-encryption-provider/bin/aws-encryption-provider /aws-encryption-provider
+COPY --from=go-runner /go-runner /go-runner
 ENTRYPOINT ["/aws-encryption-provider"]
