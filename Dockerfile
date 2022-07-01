@@ -23,3 +23,4 @@ RUN	CGO_ENABLED=0 GOOS=linux go build -mod vendor -ldflags \
 FROM ${BASE_IMAGE}
 COPY --from=build /go/src/sigs.k8s.io/aws-encryption-provider/bin/aws-encryption-provider /aws-encryption-provider
 ENTRYPOINT ["/go-runner"]
+CMD ["/aws-encryption-provider"]
