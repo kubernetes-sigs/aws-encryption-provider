@@ -15,7 +15,7 @@ lint:
 	hack/verify-golint.sh
 
 test:
-	go test -mod vendor -v -cover -race ./...
+	go test -mod mod -v -cover -race ./...
 
 build-docker:
 	docker build \
