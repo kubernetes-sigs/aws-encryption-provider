@@ -3,7 +3,7 @@ module sigs.k8s.io/aws-encryption-provider
 go 1.15
 
 require (
-	github.com/aws/aws-sdk-go v1.44.107
+	github.com/aws/aws-sdk-go v1.44.145
 	github.com/golangci/golangci-lint v1.41.1
 	github.com/prometheus/client_golang v1.7.1
 	github.com/spf13/pflag v1.0.5
@@ -31,3 +31,5 @@ replace github.com/golangci/lint-1 v0.0.0-20180610141402-ee948d087217 => github.
 replace github.com/timakin/bodyclose => github.com/golangci/bodyclose v0.0.0-20190714144026-65da19158fa2
 
 replace mvdan.cc/unparam v0.0.0-20190124213536-fbb59629db34 => mvdan.cc/unparam v0.0.0-20190209190245-fbb59629db34
+
+replace golang.org/x/sys => golang.org/x/sys v0.0.0-20220811171246-fbc7d0a398ab
