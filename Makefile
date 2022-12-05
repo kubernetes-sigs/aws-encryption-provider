@@ -7,8 +7,6 @@ TAG?=0.0.1
 lint:
 	echo "Verifying go mod tidy"
 	hack/verify-mod-tidy.sh
-	echo "Verifying vendored dependencies"
-	hack/verify-vendor.sh
 	echo "Verifying gofmt"
 	hack/verify-gofmt.sh
 	echo "Verifying linting"
