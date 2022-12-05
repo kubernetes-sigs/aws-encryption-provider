@@ -22,10 +22,10 @@ build-docker:
 		--build-arg TAG=${TAG} .
 
 build-server:
-	go build -mod vendor -ldflags \
+	go build -mod mod -ldflags \
 			"-w -s -X sigs.k8s.io/aws-encryption-provider/pkg/version.Version=${TAG}" \
 			-o bin/aws-encryption-provider cmd/server/main.go
 
 build-client:
-	go build -mod vendor -ldflags "-w -s" -o bin/grpcclient cmd/client/main.go
+	go build -mod mod -ldflags "-w -s" -o bin/grpcclient cmd/client/main.go
 
