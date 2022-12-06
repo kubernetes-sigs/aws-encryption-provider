@@ -18,7 +18,7 @@ set -euo pipefail
 
 if ! which golangci-lint > /dev/null; then
     echo "Cannot find golangci-lint. Installing golangci-lint..."
-    GO111MODULE=on go get -v github.com/golangci/golangci-lint/cmd/golangci-lint@v1.41.1
+    GO111MODULE=on go install -v github.com/golangci/golangci-lint/cmd/golangci-lint@v1.41.1
 fi
 
 $GOPATH/bin/golangci-lint run --deadline=10m

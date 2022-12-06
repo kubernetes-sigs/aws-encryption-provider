@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
+	//nolint
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/request"
 	awsreq "github.com/aws/aws-sdk-go/aws/request"
@@ -222,7 +223,6 @@ func (p *Plugin) recordErr(err error) {
 //  1. there was never a health check done
 //  2. there was no health check done for the last "healthCheckPeriod"
 //     (only use the cached error if the error is from recent API call)
-//
 func (p *Plugin) Health() error {
 	recent, err := p.isRecentlyChecked()
 	if !recent {
