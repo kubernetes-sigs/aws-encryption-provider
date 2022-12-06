@@ -9,7 +9,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 ARG BUILDER=golang:1.19-alpine
-ARG BASE_IMAGE=public.ecr.aws/eks-distro/kubernetes/go-runner:v0.13.0-eks-1-23-1
+ARG BASE_IMAGE=public.ecr.aws/eks-distro/kubernetes/go-runner:v0.13.0-eks-1-23-9
 
 FROM ${BUILDER} AS build
 WORKDIR /go/src/sigs.k8s.io/aws-encryption-provider
