@@ -63,3 +63,5 @@ replace github.com/golangci/lint-1 v0.0.0-20180610141402-ee948d087217 => github.
 replace github.com/timakin/bodyclose => github.com/golangci/bodyclose v0.0.0-20190714144026-65da19158fa2
 
 replace mvdan.cc/unparam v0.0.0-20190124213536-fbb59629db34 => mvdan.cc/unparam v0.0.0-20190209190245-fbb59629db34
+
+replace k8s.io/apiserver => k8s.io/apiserver v0.26.2
