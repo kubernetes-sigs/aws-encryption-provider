@@ -25,7 +25,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/kms"
 	"go.uber.org/zap"
-	pb "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/v1beta1"
+	pb "k8s.io/kms/apis/v1beta1"
 	"sigs.k8s.io/aws-encryption-provider/pkg/cloud"
 )
 
