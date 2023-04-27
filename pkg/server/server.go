@@ -16,7 +16,9 @@ package server
 import (
 	"fmt"
 	"net"
+	"os"
 
+	"go.uber.org/zap"
 	"google.golang.org/grpc"
 )
 
@@ -31,6 +33,21 @@ func New() *Server {
 }
 
 func (s *Server) ListenAndServe(addr string) error {
+	// Server should remove the socket file prior to binding it in case the socket isn't cleaned up gracefully.
+	// This can happen if the application is killed by SIGKILL or SIGSTOP, i.e. kill -9 or docker kill by default.
+	if _, err := os.Stat(addr); err != nil {
+		if !os.IsNotExist(err) {
+			return fmt.Errorf("failed to os.Stat socket: %v", err)
+		}
+	} else {
+		// the socket file exists, it should be removed
+		zap.L().Info("Removing existing socket", zap.String("address", addr))
+		if err = os.Remove(addr); err != nil {
+			if !os.IsNotExist(err) {
+				return fmt.Errorf("failed to os.Remove existing socket: %v", err)
+			}
+		}
+	}
 	l, err := net.Listen("unix", addr)
 	if err != nil {
 		return fmt.Errorf("failed to create listener: %v", err)
