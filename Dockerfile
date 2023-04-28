@@ -8,15 +8,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-ARG BUILDER=golang:1.15-alpine
-ARG BASE_IMAGE=public.ecr.aws/eks-distro/kubernetes/go-runner:v0.13.0-eks-1-23-1
+ARG BUILDER=golang:1.19-alpine
+ARG BASE_IMAGE=public.ecr.aws/eks-distro/kubernetes/go-runner:v0.13.0-eks-1-23-9
 
 FROM ${BUILDER} AS build
 WORKDIR /go/src/sigs.k8s.io/aws-encryption-provider
 ARG TAG
 COPY . ./
 ENV GO111MODULE=on
-RUN	CGO_ENABLED=0 GOOS=linux go build -mod vendor -ldflags \
+RUN	CGO_ENABLED=0 GOOS=linux go build -mod mod -ldflags \
     "-w -s -X sigs.k8s.io/aws-encryption-provider/pkg/version.Version=$TAG" \
     -o bin/aws-encryption-provider cmd/server/main.go
 

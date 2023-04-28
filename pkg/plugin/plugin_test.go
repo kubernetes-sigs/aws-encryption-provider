@@ -25,7 +25,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/kms"
 	"go.uber.org/zap"
-	pb "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/v1beta1"
+	pb "k8s.io/kms/apis/v1beta1"
 	"sigs.k8s.io/aws-encryption-provider/pkg/cloud"
 )
 
@@ -88,6 +88,24 @@ func TestEncrypt(t *testing.T) {
 			output:    "",
 			err:       awserr.New(kms.ErrCodeLimitExceededException, "test", errors.New("fail")),
 			errType:   KMSErrorTypeThrottled,
+			healthErr: true,
+			checkErr:  true,
+		},
+		{
+			input:     plainMessage,
+			ctx:       nil,
+			output:    "",
+			err:       awserr.New("AccessDeniedException", "The ciphertext refers to a customer master key that does not exist, does not exist in this region, or you are not allowed to access", errors.New("fail")),
+			errType:   KMSErrorTypeUserInduced,
+			healthErr: true,
+			checkErr:  false,
+		},
+		{
+			input:     plainMessage,
+			ctx:       nil,
+			output:    "",
+			err:       awserr.New("AccessDeniedException", "Some other error message", errors.New("fail")),
+			errType:   KMSErrorTypeOther,
 			healthErr: true,
 			checkErr:  true,
 		},
