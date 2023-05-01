@@ -1,6 +1,8 @@
 REPO?=gcr.io/must-override
 IMAGE?=aws-encryption-provider
 TAG?=0.0.1
+GOOS?=$(shell go env GOOS)
+GOARCH?=$(shell go env GOARCH)
 
 .PHONY: lint test build-docker build-server build-client
 
@@ -16,7 +18,9 @@ test:
 	go test -mod mod -v -cover -race ./...
 
 build-docker:
-	docker build \
+	docker buildx build \
+		--output=type=docker \
+		--platform=linux/$(GOARCH) \
 		-t ${REPO}/${IMAGE}:latest \
 		-t ${REPO}/${IMAGE}:${TAG} \
 		--build-arg TAG=${TAG} .
