@@ -16,7 +16,6 @@ package plugin
 import (
 	"context"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -36,32 +35,16 @@ type V1Plugin struct {
 	svc           kmsiface.KMSAPI
 	keyID         string
 	encryptionCtx map[string]*string
-
-	lastMu  sync.RWMutex
-	lastErr error
-	lastTs  time.Time
-
-	healthCheckPeriod         time.Duration
-	healthCheckErrc           chan error
-	healthCheckStopcCloseOnce *sync.Once
-	healthCheckStopc          chan struct{}
-	healthCheckClosed         chan struct{}
+	healthCheck   *SharedHealthCheck
 }
 
-// TODO: make configurable
-const (
-	defaultHealthCheckPeriod = 30 * time.Second
-	defaultErrcBufSize       = 100
-)
-
 // New returns a new *V1Plugin
-func New(key string, svc kmsiface.KMSAPI, encryptionCtx map[string]string) *V1Plugin {
+func New(key string, svc kmsiface.KMSAPI, encryptionCtx map[string]string, healthCheck *SharedHealthCheck) *V1Plugin {
 	return newPlugin(
 		key,
 		svc,
 		encryptionCtx,
-		defaultHealthCheckPeriod,
-		defaultErrcBufSize,
+		healthCheck,
 	)
 }
 
@@ -69,17 +52,12 @@ func newPlugin(
 	key string,
 	svc kmsiface.KMSAPI,
 	encryptionCtx map[string]string,
-	checkPeriod time.Duration,
-	errcBuf int,
+	sharedHealthCheck *SharedHealthCheck,
 ) *V1Plugin {
 	p := &V1Plugin{
-		svc:                       svc,
-		keyID:                     key,
-		healthCheckPeriod:         checkPeriod,
-		healthCheckErrc:           make(chan error, errcBuf),
-		healthCheckStopcCloseOnce: new(sync.Once),
-		healthCheckStopc:          make(chan struct{}),
-		healthCheckClosed:         make(chan struct{}),
+		svc:         svc,
+		keyID:       key,
+		healthCheck: sharedHealthCheck,
 	}
 	if len(encryptionCtx) > 0 {
 		p.encryptionCtx = make(map[string]*string)
@@ -87,43 +65,7 @@ func newPlugin(
 	for k, v := range encryptionCtx {
 		p.encryptionCtx[k] = aws.String(v)
 	}
-	go p.startCheckHealth()
 	return p
-}
-
-func (p *V1Plugin) startCheckHealth() {
-	zap.L().Info("starting health check routine", zap.String("period", p.healthCheckPeriod.String()))
-	for {
-		select {
-		case <-p.healthCheckStopc:
-			zap.L().Warn("exiting health check routine")
-			p.healthCheckClosed <- struct{}{}
-			return
-		case err := <-p.healthCheckErrc:
-			p.recordErr(err)
-		}
-	}
-}
-
-func (p *V1Plugin) stopCheckHealth() {
-	p.healthCheckStopcCloseOnce.Do(func() {
-		close(p.healthCheckStopc)
-		<-p.healthCheckClosed
-	})
-}
-
-func (p *V1Plugin) isRecentlyChecked() (bool, error) {
-	p.lastMu.RLock()
-	err, ts := p.lastErr, p.lastTs
-	never, latest := err == nil && ts.IsZero(), time.Since(ts) < p.healthCheckPeriod
-	p.lastMu.RUnlock()
-	return !never && latest, err
-}
-
-func (p *V1Plugin) recordErr(err error) {
-	p.lastMu.Lock()
-	p.lastErr, p.lastTs = err, time.Now()
-	p.lastMu.Unlock()
 }
 
 // Health checks KMS API availability.
@@ -142,10 +84,10 @@ func (p *V1Plugin) recordErr(err error) {
 //  2. there was no health check done for the last "healthCheckPeriod"
 //     (only use the cached error if the error is from recent API call)
 func (p *V1Plugin) Health() error {
-	recent, err := p.isRecentlyChecked()
+	recent, err := p.healthCheck.isRecentlyChecked()
 	if !recent {
 		_, err = p.Encrypt(context.Background(), &pb.EncryptRequest{Plain: []byte("foo")})
-		p.recordErr(err)
+		p.healthCheck.recordErr(err)
 		if err != nil {
 			zap.L().Warn("health check failed", zap.Error(err))
 		}
@@ -195,7 +137,7 @@ func (p *V1Plugin) Encrypt(ctx context.Context, request *pb.EncryptRequest) (*pb
 	result, err := p.svc.Encrypt(input)
 	if err != nil {
 		select {
-		case p.healthCheckErrc <- err:
+		case p.healthCheck.healthCheckErrc <- err:
 		default:
 		}
 		zap.L().Error("request to encrypt failed", zap.String("error-type", kmsplugin.ParseError(err).String()), zap.Error(err))
@@ -230,7 +172,7 @@ func (p *V1Plugin) Decrypt(ctx context.Context, request *pb.DecryptRequest) (*pb
 	result, err := p.svc.Decrypt(input)
 	if err != nil {
 		select {
-		case p.healthCheckErrc <- err:
+		case p.healthCheck.healthCheckErrc <- err:
 		default:
 		}
 		zap.L().Error("request to decrypt failed", zap.String("error-type", kmsplugin.ParseError(err).String()), zap.Error(err))
