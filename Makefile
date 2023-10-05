@@ -32,4 +32,5 @@ build-server:
 
 build-client:
 	go build -ldflags "-w -s" -o bin/grpcclient cmd/client/main.go
+	go build -ldflags "-w -s" -o bin/grpcclientv2 cmd/clientv2/main.go
 

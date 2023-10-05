@@ -84,6 +84,8 @@ func main() {
 	s := server.New()
 	p := plugin.New(*key, c, *encryptionCtx)
 	p.Register(s.Server)
+	p2 := plugin.NewV2(*key, c, *encryptionCtx)
+	p2.Register(s.Server)
 	go func() {
 		http.Handle(*healthzPath, healthz.NewHandler(p))
 		http.Handle(*livezPath, livez.NewHandler(p))

@@ -16,7 +16,6 @@ package plugin
 import (
 	"context"
 	"errors"
-	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -25,19 +24,12 @@ import (
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/kms"
 	"go.uber.org/zap"
-	pb "k8s.io/kms/apis/v1beta1"
+	pb "k8s.io/kms/apis/v2"
 	"sigs.k8s.io/aws-encryption-provider/pkg/cloud"
 	"sigs.k8s.io/aws-encryption-provider/pkg/kmsplugin"
 )
 
-var (
-	key              = "fakekey"
-	encryptedMessage = "aGVsbG8gd29ybGQ="
-	plainMessage     = "hello world"
-	errorMessage     = fmt.Errorf("oops")
-)
-
-func TestEncrypt(t *testing.T) {
+func TestEncryptV2(t *testing.T) {
 	tt := []struct {
 		input     string
 		ctx       map[string]string
@@ -172,12 +164,12 @@ func TestEncrypt(t *testing.T) {
 	for idx, tc := range tt {
 		func() {
 			c.SetEncryptResp(tc.output, tc.err)
-			p := New(key, c, nil)
+			p := NewV2(key, c, nil)
 			defer func() {
 				p.stopCheckHealth()
 			}()
 
-			eReq := &pb.EncryptRequest{Plain: []byte(tc.input)}
+			eReq := &pb.EncryptRequest{Plaintext: []byte(tc.input)}
 			eRes, err := p.Encrypt(ctx, eReq)
 
 			if tc.err != nil && err == nil {
@@ -188,8 +180,8 @@ func TestEncrypt(t *testing.T) {
 				t.Fatalf("#%d: returned unexpected error: %v", idx, err)
 			}
 
-			if tc.err == nil && string(eRes.Cipher) != kmsplugin.StorageVersion+tc.output {
-				t.Fatalf("#%d: expected %s, but got %s", idx, kmsplugin.StorageVersion+tc.output, string(eRes.Cipher))
+			if tc.err == nil && string(eRes.Ciphertext) != kmsplugin.StorageVersion+tc.output {
+				t.Fatalf("#%d: expected %s, but got %s", idx, kmsplugin.StorageVersion+tc.output, string(eRes.Ciphertext))
 			}
 
 			et := kmsplugin.ParseError(tc.err)
@@ -215,7 +207,7 @@ func TestEncrypt(t *testing.T) {
 		}()
 	}
 }
-func TestDecrypt(t *testing.T) {
+func TestDecryptV2(t *testing.T) {
 	tt := []struct {
 		input  string
 		ctx    map[string]string
@@ -248,12 +240,12 @@ func TestDecrypt(t *testing.T) {
 	for _, tc := range tt {
 		func() {
 			c.SetDecryptResp(tc.output, tc.err)
-			p := New(key, c, tc.ctx)
+			p := NewV2(key, c, tc.ctx)
 			defer func() {
 				p.stopCheckHealth()
 			}()
 
-			dReq := &pb.DecryptRequest{Cipher: []byte(tc.input)}
+			dReq := &pb.DecryptRequest{Ciphertext: []byte(tc.input)}
 			dRes, err := p.Decrypt(ctx, dReq)
 
 			if tc.err != nil && err == nil {
@@ -264,14 +256,14 @@ func TestDecrypt(t *testing.T) {
 				t.Fatalf("Returned unexpected error: %v", err)
 			}
 
-			if tc.err == nil && string(dRes.Plain) != tc.output {
-				t.Fatalf("Expected %s, but got %s", tc.output, string(dRes.Plain))
+			if tc.err == nil && string(dRes.Plaintext) != tc.output {
+				t.Fatalf("Expected %s, but got %s", tc.output, string(dRes.Plaintext))
 			}
 		}()
 	}
 }
 
-func TestHealth(t *testing.T) {
+func TestHealthV2(t *testing.T) {
 	zap.ReplaceGlobals(zap.NewExample())
 
 	tt := []struct {
@@ -290,7 +282,7 @@ func TestHealth(t *testing.T) {
 	for idx, entry := range tt {
 		c := &cloud.KMSMock{}
 
-		p := New(key, c, nil)
+		p := NewV2(key, c, nil)
 		defer func() {
 			p.stopCheckHealth()
 		}()
@@ -298,7 +290,7 @@ func TestHealth(t *testing.T) {
 		c.SetEncryptResp("foo", entry.encryptErr)
 		c.SetDecryptResp("foo", entry.decryptErr)
 
-		_, encErr := p.Encrypt(context.Background(), &pb.EncryptRequest{Plain: []byte("foo")})
+		_, encErr := p.Encrypt(context.Background(), &pb.EncryptRequest{Plaintext: []byte("foo")})
 		if entry.encryptErr == nil && encErr != nil {
 			t.Fatalf("#%d: unexpected error from Encrypt %v", idx, encErr)
 		}
@@ -311,7 +303,7 @@ func TestHealth(t *testing.T) {
 			t.Fatalf("#%d: unexpected error from Health %v", idx, herr1)
 		}
 
-		_, decErr := p.Decrypt(context.Background(), &pb.DecryptRequest{Cipher: []byte("foo")})
+		_, decErr := p.Decrypt(context.Background(), &pb.DecryptRequest{Ciphertext: []byte("foo")})
 		if entry.decryptErr == nil && decErr != nil {
 			t.Fatalf("#%d: unexpected error from Encrypt %v", idx, decErr)
 		}
@@ -328,12 +320,12 @@ func TestHealth(t *testing.T) {
 
 // TestHealthManyRequests sends many requests to fill up the error channel,
 // and ensures following encrypt/decrypt operation do not block.
-func TestHealthManyRequests(t *testing.T) {
+func TestHealthManyRequestsV2(t *testing.T) {
 	zap.ReplaceGlobals(zap.NewExample())
 
 	c := &cloud.KMSMock{}
 
-	p := newPlugin(key, c, nil, defaultHealthCheckPeriod, 0)
+	p := newPluginV2(key, c, nil, defaultHealthCheckPeriod, 0)
 	defer func() {
 		p.stopCheckHealth()
 	}()
@@ -344,7 +336,7 @@ func TestHealthManyRequests(t *testing.T) {
 		go func() {
 			_, err := p.Encrypt(
 				context.Background(),
-				&pb.EncryptRequest{Plain: []byte("foo")},
+				&pb.EncryptRequest{Plaintext: []byte("foo")},
 			)
 			errc <- err
 		}()
