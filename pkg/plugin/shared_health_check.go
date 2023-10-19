@@ -36,11 +36,10 @@ func NewSharedHealthCheck(
 		healthCheckStopc:          make(chan struct{}),
 		healthCheckClosed:         make(chan struct{}),
 	}
-	go p.startCheckHealth()
 	return p
 }
 
-func (p *SharedHealthCheck) startCheckHealth() {
+func (p *SharedHealthCheck) Start() {
 	zap.L().Info("starting health check routine", zap.String("period", p.healthCheckPeriod.String()))
 	for {
 		select {
@@ -54,7 +53,7 @@ func (p *SharedHealthCheck) startCheckHealth() {
 	}
 }
 
-func (p *SharedHealthCheck) stopCheckHealth() {
+func (p *SharedHealthCheck) Stop() {
 	p.healthCheckStopcCloseOnce.Do(func() {
 		close(p.healthCheckStopc)
 		<-p.healthCheckClosed

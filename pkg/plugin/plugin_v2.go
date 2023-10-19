@@ -19,7 +19,6 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
-
 	"github.com/aws/aws-sdk-go/service/kms"
 	"github.com/aws/aws-sdk-go/service/kms/kmsiface"
 	"go.uber.org/zap"
@@ -29,6 +28,10 @@ import (
 )
 
 var _ pb.KeyManagementServiceServer = &V2Plugin{}
+
+const (
+	GRPC_V2 = "v2"
+)
 
 // Plugin implements the KeyManagementServiceServer
 type V2Plugin struct {
@@ -94,11 +97,18 @@ func (p *V2Plugin) Health() error {
 		return err
 	}
 	if err != nil {
-		zap.L().Warn("health check failed", zap.Error(err))
+		zap.L().Warn("cached health check failed", zap.Error(err))
 	} else {
 		zap.L().Debug("health check success")
 	}
 	return err
+}
+
+func (p *V2Plugin) Live() error {
+	if err := p.Health(); err != nil && kmsplugin.ParseError(err) != kmsplugin.KMSErrorTypeUserInduced {
+		return err
+	}
+	return nil
 }
 
 // Status returns the V2Plugin server status
@@ -136,16 +146,16 @@ func (p *V2Plugin) Encrypt(ctx context.Context, request *pb.EncryptRequest) (*pb
 		}
 		zap.L().Error("request to encrypt failed", zap.String("error-type", kmsplugin.ParseError(err).String()), zap.Error(err))
 		failLabel := kmsplugin.GetStatusLabel(err)
-		kmsLatencyMetricV2.WithLabelValues(p.keyID, failLabel, kmsplugin.OperationEncrypt).Observe(kmsplugin.GetMillisecondsSince(startTime))
-		kmsOperationCounterV2.WithLabelValues(p.keyID, failLabel, kmsplugin.OperationEncrypt).Inc()
+		kmsLatencyMetric.WithLabelValues(p.keyID, failLabel, kmsplugin.OperationEncrypt, GRPC_V2).Observe(kmsplugin.GetMillisecondsSince(startTime))
+		kmsOperationCounter.WithLabelValues(p.keyID, failLabel, kmsplugin.OperationEncrypt, GRPC_V2).Inc()
 		return nil, fmt.Errorf("failed to encrypt %w", err)
 	}
 
 	zap.L().Debug("encrypt operation successful")
-	kmsLatencyMetricV2.WithLabelValues(p.keyID, kmsplugin.StatusSuccess, kmsplugin.OperationEncrypt).Observe(kmsplugin.GetMillisecondsSince(startTime))
-	kmsOperationCounterV2.WithLabelValues(p.keyID, kmsplugin.StatusSuccess, kmsplugin.OperationEncrypt).Inc()
+	kmsLatencyMetric.WithLabelValues(p.keyID, kmsplugin.StatusSuccess, kmsplugin.OperationEncrypt, GRPC_V2).Observe(kmsplugin.GetMillisecondsSince(startTime))
+	kmsOperationCounter.WithLabelValues(p.keyID, kmsplugin.StatusSuccess, kmsplugin.OperationEncrypt, GRPC_V2).Inc()
 	return &pb.EncryptResponse{
-		Ciphertext: append([]byte(kmsplugin.StorageVersion), result.CiphertextBlob...),
+		Ciphertext: append([]byte(kmsplugin.KMSStorageVersionV2), result.CiphertextBlob...),
 		KeyId:      p.keyID,
 	}, nil
 }
@@ -155,8 +165,13 @@ func (p *V2Plugin) Decrypt(ctx context.Context, request *pb.DecryptRequest) (*pb
 	zap.L().Debug("starting decrypt operation")
 
 	startTime := time.Now()
-	if string(request.Ciphertext[0]) == kmsplugin.StorageVersion {
+	storageVersion := kmsplugin.KMSStorageVersion(request.Ciphertext[0])
+	switch storageVersion {
+	case kmsplugin.KMSStorageVersionV2:
 		request.Ciphertext = request.Ciphertext[1:]
+	default:
+		// enforce the kmsplugin.StorageVersion in v2
+		return nil, fmt.Errorf("version %s in Ciphertext doesn't match kmsplugin", storageVersion)
 	}
 	input := &kms.DecryptInput{
 		CiphertextBlob: request.Ciphertext,
@@ -174,14 +189,14 @@ func (p *V2Plugin) Decrypt(ctx context.Context, request *pb.DecryptRequest) (*pb
 		}
 		zap.L().Error("request to decrypt failed", zap.String("error-type", kmsplugin.ParseError(err).String()), zap.Error(err))
 		failLabel := kmsplugin.GetStatusLabel(err)
-		kmsLatencyMetricV2.WithLabelValues(p.keyID, failLabel, kmsplugin.OperationDecrypt).Observe(kmsplugin.GetMillisecondsSince(startTime))
-		kmsOperationCounterV2.WithLabelValues(p.keyID, failLabel, kmsplugin.OperationDecrypt).Inc()
+		kmsLatencyMetric.WithLabelValues(p.keyID, failLabel, kmsplugin.OperationDecrypt, GRPC_V2).Observe(kmsplugin.GetMillisecondsSince(startTime))
+		kmsOperationCounter.WithLabelValues(p.keyID, failLabel, kmsplugin.OperationDecrypt, GRPC_V2).Inc()
 		return nil, fmt.Errorf("failed to decrypt %w", err)
 	}
 
 	zap.L().Debug("decrypt operation successful")
-	kmsLatencyMetricV2.WithLabelValues(p.keyID, kmsplugin.StatusSuccess, kmsplugin.OperationDecrypt).Observe(kmsplugin.GetMillisecondsSince(startTime))
-	kmsOperationCounterV2.WithLabelValues(p.keyID, kmsplugin.StatusSuccess, kmsplugin.OperationDecrypt).Inc()
+	kmsLatencyMetric.WithLabelValues(p.keyID, kmsplugin.StatusSuccess, kmsplugin.OperationDecrypt, GRPC_V2).Observe(kmsplugin.GetMillisecondsSince(startTime))
+	kmsOperationCounter.WithLabelValues(p.keyID, kmsplugin.StatusSuccess, kmsplugin.OperationDecrypt, GRPC_V2).Inc()
 	return &pb.DecryptResponse{Plaintext: result.Plaintext}, nil
 }
 
