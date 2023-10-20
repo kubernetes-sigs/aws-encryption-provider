@@ -64,8 +64,10 @@ func TestLivez(t *testing.T) {
 
 			c := &cloud.KMSMock{}
 			c.SetEncryptResp("test", entry.kmsEncryptErr)
-
-			p := plugin.New("test-key", c, nil)
+			sharedHealthCheck := plugin.NewSharedHealthCheck(plugin.DefaultHealthCheckPeriod, plugin.DefaultErrcBufSize)
+			go sharedHealthCheck.Start()
+			defer sharedHealthCheck.Stop()
+			p := plugin.New("test-key", c, nil, sharedHealthCheck)
 
 			ready, errc := make(chan struct{}), make(chan error)
 			s := server.New()

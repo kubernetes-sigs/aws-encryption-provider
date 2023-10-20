@@ -10,12 +10,12 @@ import (
 )
 
 // NewHandler returns a new healthz handler.
-func NewHandler(p *plugin.Plugin) http.Handler {
+func NewHandler(p *plugin.V1Plugin) http.Handler {
 	return &handler{p: p}
 }
 
 type handler struct {
-	p *plugin.Plugin
+	p *plugin.V1Plugin
 }
 
 func (hd *handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
