@@ -8,7 +8,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-ARG BUILDER=public.ecr.aws/eks-distro-build-tooling/golang:1.19-gcc
+ARG BUILDER=public.ecr.aws/eks-distro-build-tooling/golang:1.20.10-11-gcc
 ARG BASE_IMAGE=public.ecr.aws/eks-distro/kubernetes/go-runner:v0.13.0-eks-1-23-9
 
 FROM --platform=$BUILDPLATFORM ${BUILDER} AS build

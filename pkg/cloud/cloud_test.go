@@ -1,7 +1,6 @@
 package cloud
 
 import (
-	"io/ioutil"
 	"os"
 	"testing"
 
@@ -43,7 +42,7 @@ func TestNewSessionClientWithEnv(t *testing.T) {
 }
 
 func createTmpFile(b []byte) (string, error) {
-	bundleFile, err := ioutil.TempFile(os.TempDir(), "aws-sdk-go-session-test")
+	bundleFile, err := os.CreateTemp(os.TempDir(), "aws-sdk-go-session-test")
 	if err != nil {
 		return "", err
 	}

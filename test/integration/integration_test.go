@@ -16,7 +16,7 @@ package integration
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"testing"
 	"time"
 
@@ -43,7 +43,7 @@ func setup(t *testing.T) (string, *server.Server, *cloud.KMSMock, pb.KeyManageme
 	defer sharedHealthCheck.Stop()
 	p := plugin.New(key, c, nil, sharedHealthCheck)
 	p.Register(s.Server)
-	dir, err := ioutil.TempDir("", "run")
+	dir, err := os.MkdirTemp("", "run")
 	if err != nil {
 		t.Fatalf("failed to create tmp dir: %v", err)
 	}

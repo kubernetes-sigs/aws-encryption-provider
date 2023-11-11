@@ -15,7 +15,7 @@ lint:
 	hack/verify-golint.sh
 
 test:
-	go test -v -cover -race ./...
+	hack/run-test.sh
 
 build-docker:
 	docker buildx build \
@@ -23,14 +23,12 @@ build-docker:
 		--platform=linux/$(GOARCH) \
 		-t ${REPO}/${IMAGE}:latest \
 		-t ${REPO}/${IMAGE}:${TAG} \
+		--build-arg BUILDER=$(shell hack/setup-go.sh) \
 		--build-arg TAG=${TAG} .
 
 build-server:
-	go build -ldflags \
-			"-w -s -X sigs.k8s.io/aws-encryption-provider/pkg/version.Version=${TAG}" \
-			-o bin/aws-encryption-provider cmd/server/main.go
+	TAG=${TAG} hack/build-server.sh
 
 build-client:
-	go build -ldflags "-w -s" -o bin/grpcclient cmd/client/main.go
-	go build -ldflags "-w -s" -o bin/grpcclientv2 cmd/clientv2/main.go
+	TAG=${TAG} hack/build-client.sh
 

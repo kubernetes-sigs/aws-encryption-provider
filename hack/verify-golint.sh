@@ -16,6 +16,10 @@
 
 set -euo pipefail
 
+source hack/setup-go.sh
+
+go version
+
 if ! which golangci-lint > /dev/null; then
     echo "Cannot find golangci-lint. Installing golangci-lint..."
     GO111MODULE=on go install -v github.com/golangci/golangci-lint/cmd/golangci-lint@v1.41.1

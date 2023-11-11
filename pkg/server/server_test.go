@@ -39,7 +39,10 @@ func TestListenAndServe(t *testing.T) {
 			s := New()
 			os.Remove(entry.addr)
 			if entry.addr == (dir + "/fileExists.sock") {
-				os.Create(entry.addr)
+				_, err := os.Create(entry.addr)
+				if err != nil {
+					log.Fatal(err)
+				}
 				time.Sleep(3 * time.Second)
 			}
 			go func(addr string) {
