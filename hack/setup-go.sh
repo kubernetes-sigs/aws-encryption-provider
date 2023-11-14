@@ -16,11 +16,10 @@
 # script to setup go version with gimme as needed
 # MUST BE RUN FROM THE REPO ROOT DIRECTORY
 
-# read go-version file unless GO_VERSION is set
-GO_VERSION="${GO_VERSION:-"$(cat .go-version)"}"
-EKSD_GO_IMAGE_SUFFIX=$(echo $GO_VERSION | cut -d'.' -f3)
-((EKSD_GO_IMAGE_SUFFIX+=1))
-GO_IMAGE=public.ecr.aws/eks-distro-build-tooling/golang:$GO_VERSION-$EKSD_GO_IMAGE_SUFFIX-gcc
+# read go-image-tag file unless EKSD_GO_IMAGE_TAG & GO_VERSION are set
+EKSD_GO_IMAGE_TAG="${EKSD_GO_IMAGE_TAG:-"$(cat .go-image-tag)"}"
+GO_VERSION="${GO_VERSION:-"$(cat .go-image-tag | cut -d'-' -f1)"}"
+GO_IMAGE=public.ecr.aws/eks-distro-build-tooling/golang:$EKSD_GO_IMAGE_TAG-gcc
 
 # we don't actually care where the .env files are
 # however, GIMME_SILENT_ENV doesn't trigger re-generating a .env if it
