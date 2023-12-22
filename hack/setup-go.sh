@@ -16,9 +16,9 @@
 # script to setup go version with gimme as needed
 # MUST BE RUN FROM THE REPO ROOT DIRECTORY
 
-# read go-image-tag file unless EKSD_GO_IMAGE_TAG & GO_VERSION are set
-EKSD_GO_IMAGE_TAG="${EKSD_GO_IMAGE_TAG:-"$(cat .go-image-tag)"}"
-GO_VERSION="${GO_VERSION:-"$(cat .go-image-tag | cut -d'-' -f1)"}"
+# read go-version file unless EKSD_GO_IMAGE_TAG & GO_VERSION are set
+GO_VERSION="${GO_VERSION:-"$(cat .go-version)"}"
+EKSD_GO_IMAGE_TAG="${EKSD_GO_IMAGE_TAG:-"${GO_VERSION}"}"
 GO_IMAGE=public.ecr.aws/eks-distro-build-tooling/golang:$EKSD_GO_IMAGE_TAG-gcc
 
 # we don't actually care where the .env files are
