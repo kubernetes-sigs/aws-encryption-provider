@@ -12,7 +12,7 @@ jobs:
         with:
           fetch-depth: 0
       - name: Setup Go Version
-        run: echo "GO_VERSION=$(cat .go-image-tag | cut -d'-' -f1)" >> $GITHUB_ENV
+        run: echo "GO_VERSION=$(cat .go-version)" >> $GITHUB_ENV
       - name: Setup Go
         uses: actions/setup-go@v3
         with:
