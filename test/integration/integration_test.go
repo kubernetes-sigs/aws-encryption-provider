@@ -38,10 +38,7 @@ var (
 func setup(t *testing.T) (string, *server.Server, *cloud.KMSMock, pb.KeyManagementServiceClient, func() error) {
 	s := server.New()
 	c := &cloud.KMSMock{}
-	sharedHealthCheck := plugin.NewSharedHealthCheck(plugin.DefaultHealthCheckPeriod, plugin.DefaultErrcBufSize)
-	go sharedHealthCheck.Start()
-	defer sharedHealthCheck.Stop()
-	p := plugin.New(key, c, nil, sharedHealthCheck)
+	p := plugin.New(key, c, nil)
 	p.Register(s.Server)
 	dir, err := os.MkdirTemp("", "run")
 	if err != nil {

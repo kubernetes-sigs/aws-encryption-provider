@@ -81,8 +81,6 @@ func main() {
 			"value", v))
 	}
 	sharedHealthCheck := plugin.NewSharedHealthCheck(plugin.DefaultHealthCheckPeriod, plugin.DefaultErrcBufSize)
-	go sharedHealthCheck.Start()
-	defer sharedHealthCheck.Stop()
 	s := server.New()
 	p := plugin.New(*key, c, *encryptionCtx, sharedHealthCheck)
 	p.Register(s.Server)

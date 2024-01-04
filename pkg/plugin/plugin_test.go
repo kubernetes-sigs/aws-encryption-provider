@@ -31,11 +31,10 @@ import (
 )
 
 var (
-	key                = "fakekey"
-	encryptedMessage   = "aGVsbG8gd29ybGQ="
-	encryptedMessageV2 = "1aGVsbG8gd29ybGQ="
-	plainMessage       = "hello world"
-	errorMessage       = fmt.Errorf("oops")
+	key              = "fakekey"
+	encryptedMessage = "aGVsbG8gd29ybGQ="
+	plainMessage     = "hello world"
+	errorMessage     = fmt.Errorf("oops")
 )
 
 func TestEncrypt(t *testing.T) {
@@ -173,11 +172,9 @@ func TestEncrypt(t *testing.T) {
 	for idx, tc := range tt {
 		func() {
 			c.SetEncryptResp(tc.output, tc.err)
-			sharedHealthCheck := NewSharedHealthCheck(DefaultHealthCheckPeriod, DefaultErrcBufSize)
-			go sharedHealthCheck.Start()
-			p := New(key, c, nil, sharedHealthCheck)
+			p := New(key, c, nil)
 			defer func() {
-				sharedHealthCheck.Stop()
+				p.stopCheckHealth()
 			}()
 
 			eReq := &pb.EncryptRequest{Plain: []byte(tc.input)}
@@ -251,11 +248,9 @@ func TestDecrypt(t *testing.T) {
 	for _, tc := range tt {
 		func() {
 			c.SetDecryptResp(tc.output, tc.err)
-			sharedHealthCheck := NewSharedHealthCheck(DefaultHealthCheckPeriod, DefaultErrcBufSize)
-			go sharedHealthCheck.Start()
-			p := New(key, c, tc.ctx, sharedHealthCheck)
+			p := New(key, c, tc.ctx)
 			defer func() {
-				sharedHealthCheck.Stop()
+				p.stopCheckHealth()
 			}()
 
 			dReq := &pb.DecryptRequest{Cipher: []byte(tc.input)}
@@ -294,11 +289,10 @@ func TestHealth(t *testing.T) {
 	}
 	for idx, entry := range tt {
 		c := &cloud.KMSMock{}
-		sharedHealthCheck := NewSharedHealthCheck(DefaultHealthCheckPeriod, DefaultErrcBufSize)
-		go sharedHealthCheck.Start()
-		p := New(key, c, nil, sharedHealthCheck)
+
+		p := New(key, c, nil)
 		defer func() {
-			sharedHealthCheck.Stop()
+			p.stopCheckHealth()
 		}()
 
 		c.SetEncryptResp("foo", entry.encryptErr)
@@ -338,11 +332,10 @@ func TestHealthManyRequests(t *testing.T) {
 	zap.ReplaceGlobals(zap.NewExample())
 
 	c := &cloud.KMSMock{}
-	sharedHealthCheck := NewSharedHealthCheck(DefaultHealthCheckPeriod, DefaultErrcBufSize)
-	go sharedHealthCheck.Start()
-	p := newPlugin(key, c, nil, sharedHealthCheck)
+
+	p := newPlugin(key, c, nil, defaultHealthCheckPeriod, 0)
 	defer func() {
-		sharedHealthCheck.Stop()
+		p.stopCheckHealth()
 	}()
 
 	c.SetEncryptResp("foo", errors.New("fail"))

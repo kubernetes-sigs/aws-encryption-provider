@@ -104,12 +104,6 @@ const (
 // StorageVersion is a prefix used for versioning encrypted content
 const StorageVersion = "1"
 
-type KMSStorageVersion string
-
-const (
-	KMSStorageVersionV2 KMSStorageVersion = "1"
-)
-
 // TODO: make configurable
 const (
 	DefaultHealthCheckPeriod = 30 * time.Second
@@ -117,7 +111,7 @@ const (
 )
 
 func GetMillisecondsSince(startTime time.Time) float64 {
-	return float64(time.Since(startTime).Milliseconds())
+	return time.Since(startTime).Seconds() * 1000
 }
 
 func GetStatusLabel(err error) string {

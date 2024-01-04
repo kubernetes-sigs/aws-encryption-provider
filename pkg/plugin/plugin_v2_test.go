@@ -164,11 +164,9 @@ func TestEncryptV2(t *testing.T) {
 	for idx, tc := range tt {
 		func() {
 			c.SetEncryptResp(tc.output, tc.err)
-			sharedHealthCheck := NewSharedHealthCheck(DefaultHealthCheckPeriod, DefaultErrcBufSize)
-			go sharedHealthCheck.Start()
-			p := NewV2(key, c, nil, sharedHealthCheck)
+			p := NewV2(key, c, nil)
 			defer func() {
-				sharedHealthCheck.Stop()
+				p.stopCheckHealth()
 			}()
 
 			eReq := &pb.EncryptRequest{Plaintext: []byte(tc.input)}
@@ -217,13 +215,13 @@ func TestDecryptV2(t *testing.T) {
 		err    error
 	}{
 		{
-			input:  encryptedMessageV2,
+			input:  encryptedMessage,
 			ctx:    nil,
 			output: plainMessage,
 			err:    nil,
 		},
 		{
-			input:  encryptedMessageV2,
+			input:  encryptedMessage,
 			ctx:    nil,
 			output: "",
 			err:    errorMessage,
@@ -242,11 +240,9 @@ func TestDecryptV2(t *testing.T) {
 	for _, tc := range tt {
 		func() {
 			c.SetDecryptResp(tc.output, tc.err)
-			sharedHealthCheck := NewSharedHealthCheck(DefaultHealthCheckPeriod, DefaultErrcBufSize)
-			go sharedHealthCheck.Start()
-			p := NewV2(key, c, tc.ctx, sharedHealthCheck)
+			p := NewV2(key, c, tc.ctx)
 			defer func() {
-				sharedHealthCheck.Stop()
+				p.stopCheckHealth()
 			}()
 
 			dReq := &pb.DecryptRequest{Ciphertext: []byte(tc.input)}
@@ -285,11 +281,10 @@ func TestHealthV2(t *testing.T) {
 	}
 	for idx, entry := range tt {
 		c := &cloud.KMSMock{}
-		sharedHealthCheck := NewSharedHealthCheck(DefaultHealthCheckPeriod, DefaultErrcBufSize)
-		go sharedHealthCheck.Start()
-		p := NewV2(key, c, nil, sharedHealthCheck)
+
+		p := NewV2(key, c, nil)
 		defer func() {
-			sharedHealthCheck.Stop()
+			p.stopCheckHealth()
 		}()
 
 		c.SetEncryptResp("foo", entry.encryptErr)
@@ -308,7 +303,7 @@ func TestHealthV2(t *testing.T) {
 			t.Fatalf("#%d: unexpected error from Health %v", idx, herr1)
 		}
 
-		_, decErr := p.Decrypt(context.Background(), &pb.DecryptRequest{Ciphertext: []byte("1foo")})
+		_, decErr := p.Decrypt(context.Background(), &pb.DecryptRequest{Ciphertext: []byte("foo")})
 		if entry.decryptErr == nil && decErr != nil {
 			t.Fatalf("#%d: unexpected error from Encrypt %v", idx, decErr)
 		}
@@ -329,11 +324,10 @@ func TestHealthManyRequestsV2(t *testing.T) {
 	zap.ReplaceGlobals(zap.NewExample())
 
 	c := &cloud.KMSMock{}
-	sharedHealthCheck := NewSharedHealthCheck(DefaultHealthCheckPeriod, DefaultErrcBufSize)
-	go sharedHealthCheck.Start()
-	p := newPluginV2(key, c, nil, sharedHealthCheck)
+
+	p := newPluginV2(key, c, nil, defaultHealthCheckPeriod, 0)
 	defer func() {
-		sharedHealthCheck.Stop()
+		p.stopCheckHealth()
 	}()
 
 	c.SetEncryptResp("foo", errors.New("fail"))
