@@ -80,11 +80,11 @@ func main() {
 		zap.L().Info("encryption-context", zap.String("key", k), zap.String(
 			"value", v))
 	}
-	sharedHealthCheck := plugin.NewSharedHealthCheck(plugin.DefaultHealthCheckPeriod, plugin.DefaultErrcBufSize)
+
 	s := server.New()
-	p := plugin.New(*key, c, *encryptionCtx, sharedHealthCheck)
+	p := plugin.New(*key, c, *encryptionCtx)
 	p.Register(s.Server)
-	p2 := plugin.NewV2(*key, c, *encryptionCtx, sharedHealthCheck)
+	p2 := plugin.NewV2(*key, c, *encryptionCtx)
 	p2.Register(s.Server)
 	go func() {
 		http.Handle(*healthzPath, healthz.NewHandler(p))
