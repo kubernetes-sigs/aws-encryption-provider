@@ -21,7 +21,6 @@ var (
 			"key_arn",
 			"status",
 			"operation",
-			"version",
 		},
 	)
 
@@ -35,7 +34,6 @@ var (
 			"key_arn",
 			"status",
 			"operation",
-			"version",
 		},
 	)
 )

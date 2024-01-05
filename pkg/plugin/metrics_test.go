@@ -34,12 +34,12 @@ func TestMetrics(t *testing.T) {
 		{
 			key:        "test-key",
 			encryptErr: errors.New("fail"),
-			expects:    `aws_encryption_provider_kms_operations_total{key_arn="test-key",operation="encrypt",status="failure",version="v1"} 1`,
+			expects:    `aws_encryption_provider_kms_operations_total{key_arn="test-key",operation="encrypt",status="failure"} 1`,
 		},
 		{
 			key:        "test-key-throttle",
 			encryptErr: awserr.New("RequestLimitExceeded", "test", errors.New("fail")),
-			expects:    `aws_encryption_provider_kms_operations_total{key_arn="test-key-throttle",operation="encrypt",status="failure-throttle",version="v1"} 1`,
+			expects:    `aws_encryption_provider_kms_operations_total{key_arn="test-key-throttle",operation="encrypt",status="failure-throttle"} 1`,
 		},
 	}
 	for i, entry := range tt {
@@ -49,10 +49,8 @@ func TestMetrics(t *testing.T) {
 
 			c := &cloud.KMSMock{}
 			c.SetEncryptResp("test", entry.encryptErr)
-			sharedHealthCheck := NewSharedHealthCheck(DefaultHealthCheckPeriod, DefaultErrcBufSize)
-			go sharedHealthCheck.Start()
-			defer sharedHealthCheck.Stop()
-			p := New(entry.key, c, nil, sharedHealthCheck)
+
+			p := New(entry.key, c, nil)
 
 			ready, errc := make(chan struct{}), make(chan error)
 			s := server.New()
