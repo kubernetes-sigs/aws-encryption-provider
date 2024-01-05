@@ -10,12 +10,12 @@ import (
 )
 
 // NewHandler returns a new livez handler.
-func NewHandler(p *plugin.V1Plugin) http.Handler {
+func NewHandler(p *plugin.Plugin) http.Handler {
 	return &handler{p: p}
 }
 
 type handler struct {
-	p *plugin.V1Plugin
+	p *plugin.Plugin
 }
 
 func (hd *handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
