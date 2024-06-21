@@ -3,7 +3,7 @@ module sigs.k8s.io/aws-encryption-provider
 go 1.22.2
 
 require (
-	github.com/aws/aws-sdk-go v1.44.145
+	github.com/aws/aws-sdk-go v1.54.6
 	github.com/prometheus/client_golang v1.14.0
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.8.0
