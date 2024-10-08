@@ -18,12 +18,12 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/service/kms"
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/kms"
-	"github.com/aws/aws-sdk-go/service/kms/kmsiface"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	pb "k8s.io/kms/apis/v1beta1"
+	"sigs.k8s.io/aws-encryption-provider/pkg/cloud"
 	"sigs.k8s.io/aws-encryption-provider/pkg/kmsplugin"
 	"sigs.k8s.io/aws-encryption-provider/pkg/version"
 )
@@ -36,14 +36,14 @@ const (
 
 // Plugin implements the KeyManagementServiceServer
 type V1Plugin struct {
-	svc           kmsiface.KMSAPI
+	svc           cloud.AWSKMSv2
 	keyID         string
-	encryptionCtx map[string]*string
+	encryptionCtx map[string]string
 	healthCheck   *SharedHealthCheck
 }
 
 // New returns a new *V1Plugin
-func New(key string, svc kmsiface.KMSAPI, encryptionCtx map[string]string, healthCheck *SharedHealthCheck) *V1Plugin {
+func New(key string, svc cloud.AWSKMSv2, encryptionCtx map[string]string, healthCheck *SharedHealthCheck) *V1Plugin {
 	return newPlugin(
 		key,
 		svc,
@@ -54,7 +54,7 @@ func New(key string, svc kmsiface.KMSAPI, encryptionCtx map[string]string, healt
 
 func newPlugin(
 	key string,
-	svc kmsiface.KMSAPI,
+	svc cloud.AWSKMSv2,
 	encryptionCtx map[string]string,
 	sharedHealthCheck *SharedHealthCheck,
 ) *V1Plugin {
@@ -64,10 +64,10 @@ func newPlugin(
 		healthCheck: sharedHealthCheck,
 	}
 	if len(encryptionCtx) > 0 {
-		p.encryptionCtx = make(map[string]*string)
+		p.encryptionCtx = make(map[string]string)
 	}
 	for k, v := range encryptionCtx {
-		p.encryptionCtx[k] = aws.String(v)
+		p.encryptionCtx[k] = v
 	}
 	return p
 }
@@ -144,7 +144,7 @@ func (p *V1Plugin) Encrypt(ctx context.Context, request *pb.EncryptRequest) (*pb
 		input.EncryptionContext = p.encryptionCtx
 	}
 
-	result, err := p.svc.Encrypt(input)
+	result, err := p.svc.Encrypt(ctx, input)
 	if err != nil {
 		select {
 		case p.healthCheck.healthCheckErrc <- err:
@@ -182,7 +182,7 @@ func (p *V1Plugin) Decrypt(ctx context.Context, request *pb.DecryptRequest) (*pb
 		input.EncryptionContext = p.encryptionCtx
 	}
 
-	result, err := p.svc.Decrypt(input)
+	result, err := p.svc.Decrypt(ctx, input)
 	if err != nil {
 		select {
 		case p.healthCheck.healthCheckErrc <- err:
