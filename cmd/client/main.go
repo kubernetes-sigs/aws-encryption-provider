@@ -47,6 +47,7 @@ func main() {
 
 	ctx := context.Background()
 
+	//nolint:staticcheck
 	vReq := &pb.VersionRequest{}
 	vRes, err := client.Version(ctx, vReq)
 	if err != nil {
@@ -66,6 +67,7 @@ func main() {
 
 		switch splits[0] {
 		case "encrypt":
+			//nolint:staticcheck
 			eReq := &pb.EncryptRequest{Plain: []byte(splits[1])}
 			res, err := client.Encrypt(ctx, eReq)
 			if err != nil {
@@ -77,6 +79,7 @@ func main() {
 			if err != nil {
 				log.Fatalf("Failed to decode: %v", err)
 			}
+			//nolint:staticcheck
 			dReq := &pb.DecryptRequest{Cipher: b}
 			res, err := client.Decrypt(ctx, dReq)
 			if err != nil {
