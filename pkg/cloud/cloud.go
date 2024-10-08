@@ -15,7 +15,9 @@ package cloud
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"go.uber.org/zap"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/aws/ratelimit"
@@ -29,26 +31,55 @@ type AWSKMSv2 interface {
 	Decrypt(ctx context.Context, params *kms.DecryptInput, optFns ...func(*kms.Options)) (*kms.DecryptOutput, error)
 }
 
-func New(region, kmsEndpoint string, qps, burst int) (AWSKMSv2, error) {
-	cfg, err := config.LoadDefaultConfig(context.Background())
-	if err != nil {
-		return nil, fmt.Errorf("failed to create new session: %w", err)
+func New(region, kmsEndpoint string, qps, burst, retryTokenCapacity int) (AWSKMSv2, error) {
+	var optFns []func(*config.LoadOptions) error
+	if region != "" {
+		optFns = append(optFns, config.WithRegion(region))
 	}
 
-	if qps > 0 {
-		cfg, err = config.LoadDefaultConfig(context.Background(), config.WithRetryer(func() aws.Retryer {
+	switch {
+	// Use --retry-token-capacity's value if set, --qps-limit and --burst-limit are deprecated.
+	// https://docs.aws.amazon.com/sdk-for-go/v2/developer-guide/configure-retries-timeouts.html (Client-side rate limiting)
+	case retryTokenCapacity > 0:
+		optFns = append(optFns, config.WithRetryer(func() aws.Retryer {
 			return retry.NewStandard(func(o *retry.StandardOptions) {
-				o.RateLimiter = ratelimit.NewTokenRateLimit(uint(qps) * uint(burst))
+				o.RateLimiter = ratelimit.NewTokenRateLimit(uint(retryTokenCapacity))
 			})
 		}))
-		if err != nil {
-			return nil, fmt.Errorf("failed to create new session: %w", err)
+	case qps > 0 || burst > 0:
+		zap.L().Info("--qps-limit and --burst-limit are deprecated, use --retry-token-capacity instead")
+		if qps+burst <= 0 {
+			return nil, errors.New("`--qps-limit`+`--burst-limit` must be greater than zero")
 		}
+		optFns = append(optFns, config.WithRetryer(func() aws.Retryer {
+			return retry.NewStandard(func(o *retry.StandardOptions) {
+				// Attempt to set a "reasonable" value from the previous intent of --qps-limit and --burst-limit.
+				// In aws-sdk-go-v2, client-side rate limits only apply on retries, with varying token cost depending
+				// on the type of retry. However, --qps-limit and --burst-limit used to apply to all requests, so set
+				// all retry costs to a flat value of 1 until these flags are fully deprecated
+				o.RateLimiter = ratelimit.NewTokenRateLimit(uint(qps) + uint(burst))
+				o.RetryCost = 1
+				o.RetryTimeoutCost = 1
+			})
+		}))
 	}
 
-	client := kms.NewFromConfig(cfg, func(o *kms.Options) {
-		o.Region = region
-		o.BaseEndpoint = aws.String(kmsEndpoint)
-	})
+	cfg, err := config.LoadDefaultConfig(context.Background(), optFns...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create AWS config: %w", err)
+	}
+
+	if cfg.Region == "" {
+		return nil, fmt.Errorf("unable to automatically detect region, specify explicitly with --region")
+	}
+
+	var kmsOptFns []func(*kms.Options)
+	if kmsEndpoint != "" {
+		kmsOptFns = append(kmsOptFns, func(o *kms.Options) {
+			o.BaseEndpoint = aws.String(kmsEndpoint)
+		})
+	}
+
+	client := kms.NewFromConfig(cfg, kmsOptFns...)
 	return client, nil
 }

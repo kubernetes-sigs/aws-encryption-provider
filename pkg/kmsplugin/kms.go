@@ -5,10 +5,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/aws/request"
-	awsreq "github.com/aws/aws-sdk-go/aws/request"
-	"github.com/aws/aws-sdk-go/service/kms"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/aws/retry"
+	kmstypes "github.com/aws/aws-sdk-go-v2/service/kms/types"
+	"github.com/aws/smithy-go"
 	"go.uber.org/zap"
 )
 
@@ -51,30 +51,31 @@ func ParseError(err error) (errorType KMSErrorType) {
 		uerr = err
 	}
 
-	ev, ok := uerr.(awserr.Error)
-	if !ok {
+	var ae smithy.APIError
+	if !errors.As(uerr, &ae) {
 		return KMSErrorTypeOther
 	}
 
-	zap.L().Debug("parsed error", zap.String("code", ev.Code()), zap.String("message", ev.Message()))
-	if request.IsErrorThrottle(uerr) {
+	zap.L().Debug("parsed error", zap.String("code", ae.ErrorCode()), zap.String("message", ae.ErrorMessage()))
+	var defaultCodes retry.IsErrorThrottles = retry.DefaultThrottles
+	if defaultCodes.IsErrorThrottle(uerr) == aws.TrueTernary {
 		return KMSErrorTypeThrottled
 	}
-	switch ev.Code() {
+	switch ae.ErrorCode() {
 	// CMK is disabled or pending deletion
-	case kms.ErrCodeDisabledException,
-		kms.ErrCodeInvalidStateException:
+	case (&kmstypes.DisabledException{}).ErrorCode(),
+		(&kmstypes.KMSInvalidStateException{}).ErrorCode():
 		return KMSErrorTypeUserInduced
 
 	// CMK does not exist, or grant is not valid
-	case kms.ErrCodeKeyUnavailableException,
-		kms.ErrCodeInvalidArnException,
-		kms.ErrCodeInvalidGrantIdException,
-		kms.ErrCodeInvalidGrantTokenException:
+	case (&kmstypes.KeyUnavailableException{}).ErrorCode(),
+		(&kmstypes.InvalidArnException{}).ErrorCode(),
+		(&kmstypes.InvalidGrantIdException{}).ErrorCode(),
+		(&kmstypes.InvalidGrantTokenException{}).ErrorCode():
 		return KMSErrorTypeUserInduced
 
 	// ref. https://docs.aws.amazon.com/kms/latest/developerguide/requests-per-second.html
-	case kms.ErrCodeLimitExceededException:
+	case (&kmstypes.LimitExceededException{}).ErrorCode():
 		return KMSErrorTypeThrottled
 
 	// AWS SDK Go for KMS does not "yet" define specific error code for a case where a customer specifies the deleted key
@@ -84,13 +85,13 @@ func ParseError(err error) (errorType KMSErrorType) {
 	// e.g., "AccessDeniedException: The ciphertext refers to a customer master key that does not exist, does not exist in this region, or you are not allowed to access."
 	// KMS service may change the error message, so we do the string match.
 	case "AccessDeniedException":
-		if strings.Contains(ev.Message(), "customer master key that does not exist") ||
-			strings.Contains(ev.Message(), "does not exist in this region") {
+		if strings.Contains(ae.ErrorMessage(), "customer master key that does not exist") ||
+			strings.Contains(ae.ErrorMessage(), "does not exist in this region") {
 			return KMSErrorTypeUserInduced
 		}
-	//Some times this error message is returned as part of  KMSInvalidStateException or KMSInternalException
-	case kms.ErrCodeInternalException:
-		if strings.Contains(ev.Message(), "AWS KMS rejected the request because the external key store proxy did not respond in time. Retry the request. If you see this error repeatedly, report it to your external key store proxy administrator") {
+	// Sometimes this error message is returned as part of KMSInvalidStateException or KMSInternalException
+	case (&kmstypes.KMSInternalException{}).ErrorCode():
+		if strings.Contains(ae.ErrorMessage(), "AWS KMS rejected the request because the external key store proxy did not respond in time. Retry the request. If you see this error repeatedly, report it to your external key store proxy administrator") {
 			return KMSErrorTypeUserInduced
 		}
 	}
@@ -126,10 +127,11 @@ func GetMillisecondsSince(startTime time.Time) float64 {
 }
 
 func GetStatusLabel(err error) string {
+	var defaultCodes retry.IsErrorThrottles = retry.DefaultThrottles
 	switch {
 	case err == nil:
 		return StatusSuccess
-	case awsreq.IsErrorThrottle(err):
+	case defaultCodes.IsErrorThrottle(err) == aws.TrueTernary:
 		return StatusFailureThrottle
 	default:
 		return StatusFailure

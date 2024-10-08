@@ -25,7 +25,7 @@ zssmrkdYYvn9aUhjc3XK3tjAoDpsPpeBeTBamuUKDHoH/dNRXxerZ8vu6uPR3Pgs
 `)
 
 func TestNewSessionClientWithoutEnv(t *testing.T) {
-	kmsObjet, err := New("us-west-2", "https://kms.us-west-2.amazonaws.com", 15, 5)
+	kmsObjet, err := New("us-west-2", "https://kms.us-west-2.amazonaws.com", 0, 0, 500)
 	assert.NoError(t, err, "Failed to create object with error (%v)", err)
 	assert.NotNil(t, kmsObjet, "Failed to create object with error (%v)", err)
 }
@@ -36,7 +36,7 @@ func TestNewSessionClientWithEnv(t *testing.T) {
 	defer os.Remove(tempFile)
 	os.Setenv("AWS_CA_BUNDLE", tempFile)
 	defer os.Unsetenv("AWS_CA_BUNDLE")
-	kmsObjet, err := New("us-west-2", "https://kms.us-west-2.amazonaws.com", 15, 5)
+	kmsObjet, err := New("us-west-2", "https://kms.us-west-2.amazonaws.com", 0, 0, 500)
 	assert.NoError(t, err, "Failed to create object with error (%v)", err)
 	assert.NotNil(t, kmsObjet, "Failed to create object with error (%v)", err)
 }
@@ -54,4 +54,57 @@ func createTmpFile(b []byte) (string, error) {
 
 	defer bundleFile.Close()
 	return bundleFile.Name(), nil
+}
+
+func TestNewConfig(t *testing.T) {
+	tests := []struct {
+		name               string
+		region             string
+		endpoint           string
+		qps                int
+		burst              int
+		retryTokenCapacity int
+		expectErr          bool
+	}{
+		{
+			name:      "region specified",
+			region:    "us-west-2",
+			expectErr: false,
+		},
+		{
+			name:      "missing region",
+			expectErr: true,
+		},
+		{
+			name:      "valid qps+burst override",
+			region:    "us-east-1",
+			qps:       1,
+			burst:     5000,
+			expectErr: false,
+		},
+		{
+			name:      "invalid qps+burst override",
+			region:    "us-east-1",
+			qps:       1,
+			burst:     -10,
+			expectErr: true,
+		},
+		{
+			name:               "specify retry token capacity",
+			region:             "us-west-2",
+			retryTokenCapacity: 5000,
+			expectErr:          false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			_, err := New(test.region, test.endpoint, test.qps, test.burst, test.retryTokenCapacity)
+			if test.expectErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
 }

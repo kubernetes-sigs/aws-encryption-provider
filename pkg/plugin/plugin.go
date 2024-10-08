@@ -18,8 +18,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/kms"
-	"github.com/aws/aws-sdk-go/aws"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	pb "k8s.io/kms/apis/v1beta1"
