@@ -3,10 +3,10 @@ module sigs.k8s.io/aws-encryption-provider
 go 1.22.2
 
 require (
-	github.com/aws/aws-sdk-go v1.54.6
 	github.com/aws/aws-sdk-go-v2 v1.32.1
 	github.com/aws/aws-sdk-go-v2/config v1.27.42
 	github.com/aws/aws-sdk-go-v2/service/kms v1.37.1
+	github.com/aws/smithy-go v1.22.0
 	github.com/prometheus/client_golang v1.14.0
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.8.0
@@ -27,13 +27,11 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sso v1.24.1 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.28.1 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sts v1.32.1 // indirect
-	github.com/aws/smithy-go v1.22.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
-	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/kr/text v0.2.0 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.2 // indirect
 	github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e // indirect
