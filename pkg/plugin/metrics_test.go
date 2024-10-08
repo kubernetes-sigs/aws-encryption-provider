@@ -14,7 +14,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	kmstypes "github.com/aws/aws-sdk-go-v2/service/kms/types"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
 	pb "k8s.io/kms/apis/v1beta1"
@@ -38,7 +39,7 @@ func TestMetrics(t *testing.T) {
 		},
 		{
 			key:        "test-key-throttle",
-			encryptErr: awserr.New("RequestLimitExceeded", "test", errors.New("fail")),
+			encryptErr: &kmstypes.LimitExceededException{Message: aws.String("test")},
 			expects:    `aws_encryption_provider_kms_operations_total{key_arn="test-key-throttle",operation="encrypt",status="failure-throttle",version="v1"} 1`,
 		},
 	}
