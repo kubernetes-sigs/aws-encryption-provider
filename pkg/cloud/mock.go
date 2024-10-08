@@ -14,14 +14,14 @@ limitations under the License.
 package cloud
 
 import (
+	"context"
 	"sync"
 
-	"github.com/aws/aws-sdk-go/service/kms"
-	"github.com/aws/aws-sdk-go/service/kms/kmsiface"
+	"github.com/aws/aws-sdk-go-v2/service/kms"
 )
 
 type KMSMock struct {
-	kmsiface.KMSAPI
+	AWSKMSv2
 
 	mutex sync.Mutex
 
@@ -47,13 +47,13 @@ func (m *KMSMock) SetDecryptResp(dec string, decErr error) *KMSMock {
 	return m
 }
 
-func (m *KMSMock) Encrypt(input *kms.EncryptInput) (*kms.EncryptOutput, error) {
+func (m *KMSMock) Encrypt(ctx context.Context, params *kms.EncryptInput, optFns ...func(*kms.Options)) (*kms.EncryptOutput, error) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	return m.encOut, m.encErr
 }
 
-func (m *KMSMock) Decrypt(input *kms.DecryptInput) (*kms.DecryptOutput, error) {
+func (m *KMSMock) Decrypt(ctx context.Context, params *kms.DecryptInput, optFns ...func(*kms.Options)) (*kms.DecryptOutput, error) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	return m.decOut, m.decErr
