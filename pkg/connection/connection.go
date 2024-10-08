@@ -16,7 +16,7 @@ func New(addr string) (*grpc.ClientConn, error) {
 		return d.DialContext(ctx, "unix", addr)
 	}
 
-	conn, err := grpc.Dial(
+	conn, err := grpc.NewClient(
 		addr, grpc.WithContextDialer(dialer),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
