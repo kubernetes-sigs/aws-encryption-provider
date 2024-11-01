@@ -91,7 +91,7 @@ func TestLivez(t *testing.T) {
 				t.Fatal("took too long to start gRPC server")
 			}
 
-			hd := NewHandler(p)
+			hd := NewHandler([]*plugin.V1Plugin{p}, []*plugin.V2Plugin{})
 
 			mux := http.NewServeMux()
 			mux.Handle(entry.path, hd)

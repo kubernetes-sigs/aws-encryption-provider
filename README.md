@@ -202,6 +202,50 @@ following the below procedure. Be sure to read the Kubernetes documentation on
 [rotating a decryption key](https://kubernetes.io/docs/tasks/administer-cluster/encrypt-data/#rotating-a-decryption-key),
 as all of those steps apply to this process.
 
+#### Option 1 - Use single encryption provider
+
+Update the encryption provider for each API server to set a comma-separated list of
+keys for the `key` field and a comma-separated list of unix sockets for the `listen`
+field. These lists must be the same size. The key of each index in the `key` list
+will be associated with the unix socket at the same index of the `listen` list.
+Below is an example of the updated `command` field in the encryption provider pod
+spec.
+
+```yaml
+    command:
+    - /aws-encryption-provider
+    - --key=arn:aws:kms:us-west-2:111122223333:key/1234abcd-12ab-34cd-56ef-1234567890ab,arn:aws:kms:us-west-2:111122223333:key/4321abcd-12ab-34cd-56ef-1234567890ba
+    - --listen=/var/run/kmsplugin/socket.sock,/var/run/kmsplugin/socket2.sock
+    - --region=us-west-2
+    - --health-port=:8083
+```
+
+Below is an axample encryption configuration file using the new key.
+
+```yaml
+apiVersion: apiserver.config.k8s.io/v1
+kind: EncryptionConfiguration
+resources:
+  - resources:
+    - secrets
+    providers:
+    # using old key
+    - kms:
+        name: aws-encryption-provider
+        endpoint: unix:///var/run/kmsplugin/socket.sock
+        cachesize: 1000
+        timeout: 3s
+    # using new key
+    - kms:
+        apiVersion: v2
+        name: aws-encryption-provider-2
+        endpoint: unix:///var/run/kmsplugin/socket2.sock
+    - identity: {}
+```
+
+
+#### Option 2 - Use two encryption providers
+
 You will need to run two encryption providers on each API server using different
 keys, and you must configure them to each use a different value for the `name`
 field and each provider must listen on a different unix socket. Below is an
