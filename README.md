@@ -205,7 +205,8 @@ as all of those steps apply to this process.
 #### Option 1 - Use single encryption provider
 
 Update the encryption provider for each API server to set a comma-separated list of
-keys for the `key` field and a comma-separated list of unix sockets for the `listen`
+keys for the `key` field, a comma-separated list of unix sockets for the `listen` field,
+and a comma-separated list of kms versions (colon-separated) for the `kms-versions`
 field. These lists must be the same size. The key of each index in the `key` list
 will be associated with the unix socket at the same index of the `listen` list.
 Below is an example of the updated `command` field in the encryption provider pod
@@ -215,8 +216,9 @@ spec.
     command:
     - /aws-encryption-provider
     - --key=arn:aws:kms:us-west-2:111122223333:key/1234abcd-12ab-34cd-56ef-1234567890ab,arn:aws:kms:us-west-2:111122223333:key/4321abcd-12ab-34cd-56ef-1234567890ba
-    - --region=us-west-2
     - --listen=/var/run/kmsplugin/socket.sock,/var/run/kmsplugin/socket2.sock
+    - --kms-versions=v1:v2,v1:v2
+    - --region=us-west-2
     - --health-port=:8083
 ```
 
@@ -237,10 +239,9 @@ resources:
         timeout: 3s
     # using new key
     - kms:
+        apiVersion: v2
         name: aws-encryption-provider-2
         endpoint: unix:///var/run/kmsplugin/socket2.sock
-        cachesize: 1000
-        timeout: 3s
     - identity: {}
 ```
 
