@@ -14,40 +14,41 @@ limitations under the License.
 package cloud
 
 import (
+	"context"
 	"fmt"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/ec2metadata"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/kms"
-	"github.com/aws/aws-sdk-go/service/kms/kmsiface"
-	"sigs.k8s.io/aws-encryption-provider/pkg/httputil"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/aws/ratelimit"
+	"github.com/aws/aws-sdk-go-v2/aws/retry"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/kms"
 )
 
-type AWSKMS struct {
-	kmsiface.KMSAPI
+type AWSKMSv2 interface {
+	Encrypt(ctx context.Context, params *kms.EncryptInput, optFns ...func(*kms.Options)) (*kms.EncryptOutput, error)
+	Decrypt(ctx context.Context, params *kms.DecryptInput, optFns ...func(*kms.Options)) (*kms.DecryptOutput, error)
 }
 
-func New(region, kmsEndpoint string, qps, burst int) (*AWSKMS, error) {
-	sess, err := session.NewSession()
+func New(region, kmsEndpoint string, qps, burst int) (AWSKMSv2, error) {
+	cfg, err := config.LoadDefaultConfig(context.Background())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new session: %w", err)
 	}
-	if region == "" {
-		region, err = ec2metadata.New(sess).Region()
-		if err != nil {
-			return nil, fmt.Errorf("failed to call the metadata server's region API, %v", err)
-		}
-	}
-	cfg := &aws.Config{
-		Region:                        aws.String(region),
-		CredentialsChainVerboseErrors: aws.Bool(true),
-		Endpoint:                      aws.String(kmsEndpoint),
-	}
+
 	if qps > 0 {
-		if sess.Config.HTTPClient, err = httputil.NewRateLimitedClient(qps, burst); err != nil {
-			return nil, err
+		cfg, err = config.LoadDefaultConfig(context.Background(), config.WithRetryer(func() aws.Retryer {
+			return retry.NewStandard(func(o *retry.StandardOptions) {
+				o.RateLimiter = ratelimit.NewTokenRateLimit(uint(qps) * uint(burst))
+			})
+		}))
+		if err != nil {
+			return nil, fmt.Errorf("failed to create new session: %w", err)
 		}
 	}
-	return &AWSKMS{kms.New(sess, cfg)}, nil
+
+	client := kms.NewFromConfig(cfg, func(o *kms.Options) {
+		o.Region = region
+		o.BaseEndpoint = aws.String(kmsEndpoint)
+	})
+	return client, nil
 }
