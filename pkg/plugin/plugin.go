@@ -175,10 +175,6 @@ func (p *V1Plugin) Decrypt(ctx context.Context, request *pb.DecryptRequest) (*pb
 
 	result, err := p.svc.Decrypt(input)
 	if err != nil {
-		select {
-		case p.healthCheck.healthCheckErrc <- err:
-		default:
-		}
 		zap.L().Error("request to decrypt failed", zap.String("error-type", kmsplugin.ParseError(err).String()), zap.Error(err))
 		failLabel := kmsplugin.GetStatusLabel(err)
 		kmsLatencyMetric.WithLabelValues(p.keyID, failLabel, kmsplugin.OperationDecrypt, GRPC_V1).Observe(kmsplugin.GetMillisecondsSince(startTime))
