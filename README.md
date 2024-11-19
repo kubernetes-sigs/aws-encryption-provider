@@ -204,18 +204,29 @@ as all of those steps apply to this process.
 
 #### Option 1 - Use single encryption provider
 
-Update the encryption provider for each API server to set a comma-separated list of
-keys for the `key` field and a comma-separated list of unix sockets for the `listen`
-field. These lists must be the same size. The key of each index in the `key` list
-will be associated with the unix socket at the same index of the `listen` list.
-Below is an example of the updated `command` field in the encryption provider pod
-spec.
+Update the encryption provider for each API server to set additional `key`, `listen`,
+and optionally `encryption-context` fields. The number of `key` and `listen` fields
+added must be equivalent. These fields will be associated with each other based on
+the order they were added. For example, the first `key`, `listen`, and
+`encryption-context` fields will all be associated with each other, while the next
+occurance of each of them will be associated together.
+
+Note: `key` and `listen` fields support a comma-separated list of values as an alternative
+to using multiple `key` and `listen` fields for each value. However, `encryption-context`
+does not support a comma-separated list to distinguish between multiple keys and must use
+a separate field for each.
+
+Below is an example of the updated `command` field in the encryption provider pod spec.
 
 ```yaml
     command:
     - /aws-encryption-provider
-    - --key=arn:aws:kms:us-west-2:111122223333:key/1234abcd-12ab-34cd-56ef-1234567890ab,arn:aws:kms:us-west-2:111122223333:key/4321abcd-12ab-34cd-56ef-1234567890ba
-    - --listen=/var/run/kmsplugin/socket.sock,/var/run/kmsplugin/socket2.sock
+    - --key=arn:aws:kms:us-west-2:111122223333:key/1234abcd-12ab-34cd-56ef-1234567890ab
+    - --listen=/var/run/kmsplugin/socket.sock
+    - --encryption-context=context=mycontextforkey1
+    - --key=arn:aws:kms:us-west-2:111122223333:key/4321abcd-12ab-34cd-56ef-1234567890ba
+    - --listen=/var/run/kmsplugin/socket2.sock
+    - --encryption-context=context=mycontextforkey2
     - --region=us-west-2
     - --health-port=:8083
 ```
