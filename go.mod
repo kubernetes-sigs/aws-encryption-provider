@@ -1,6 +1,8 @@
 module sigs.k8s.io/aws-encryption-provider
 
-go 1.22.2
+go 1.23.0
+
+toolchain go1.23.3
 
 require (
 	github.com/aws/aws-sdk-go v1.54.6
@@ -10,7 +12,7 @@ require (
 	go.uber.org/zap v1.19.0
 	golang.org/x/time v0.3.0
 	google.golang.org/grpc v1.65.0
-	k8s.io/kms v0.31.0
+	k8s.io/kms v0.32.0-rc.2
 )
 
 require (
@@ -29,11 +31,11 @@ require (
 	github.com/prometheus/procfs v0.8.0 // indirect
 	go.uber.org/atomic v1.7.0 // indirect
 	go.uber.org/multierr v1.6.0 // indirect
-	golang.org/x/net v0.26.0 // indirect
-	golang.org/x/sys v0.21.0 // indirect
-	golang.org/x/text v0.16.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20240701130421-f6361c86f094 // indirect
-	google.golang.org/protobuf v1.34.2 // indirect
+	golang.org/x/net v0.30.0 // indirect
+	golang.org/x/sys v0.26.0 // indirect
+	golang.org/x/text v0.19.0 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20240826202546-f6391c0de4c7 // indirect
+	google.golang.org/protobuf v1.35.1 // indirect
 	gopkg.in/check.v1 v1.0.0-20200227125254-8fa46927fb4f // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
