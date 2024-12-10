@@ -18,12 +18,12 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/kms"
-	"github.com/aws/aws-sdk-go/service/kms/kmsiface"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/kms"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	pb "k8s.io/kms/apis/v1beta1"
+	"sigs.k8s.io/aws-encryption-provider/pkg/cloud"
 	"sigs.k8s.io/aws-encryption-provider/pkg/kmsplugin"
 	"sigs.k8s.io/aws-encryption-provider/pkg/version"
 )
@@ -36,14 +36,14 @@ const (
 
 // Plugin implements the KeyManagementServiceServer
 type V1Plugin struct {
-	svc           kmsiface.KMSAPI
+	svc           cloud.AWSKMSv2
 	keyID         string
-	encryptionCtx map[string]*string
+	encryptionCtx map[string]string
 	healthCheck   *SharedHealthCheck
 }
 
 // New returns a new *V1Plugin
-func New(key string, svc kmsiface.KMSAPI, encryptionCtx map[string]string, healthCheck *SharedHealthCheck) *V1Plugin {
+func New(key string, svc cloud.AWSKMSv2, encryptionCtx map[string]string, healthCheck *SharedHealthCheck) *V1Plugin {
 	return newPlugin(
 		key,
 		svc,
@@ -54,7 +54,7 @@ func New(key string, svc kmsiface.KMSAPI, encryptionCtx map[string]string, healt
 
 func newPlugin(
 	key string,
-	svc kmsiface.KMSAPI,
+	svc cloud.AWSKMSv2,
 	encryptionCtx map[string]string,
 	sharedHealthCheck *SharedHealthCheck,
 ) *V1Plugin {
@@ -64,10 +64,10 @@ func newPlugin(
 		healthCheck: sharedHealthCheck,
 	}
 	if len(encryptionCtx) > 0 {
-		p.encryptionCtx = make(map[string]*string)
+		p.encryptionCtx = make(map[string]string)
 	}
 	for k, v := range encryptionCtx {
-		p.encryptionCtx[k] = aws.String(v)
+		p.encryptionCtx[k] = v
 	}
 	return p
 }
@@ -90,6 +90,7 @@ func newPlugin(
 func (p *V1Plugin) Health() error {
 	recent, err := p.healthCheck.isRecentlyChecked()
 	if !recent {
+		//nolint:staticcheck
 		_, err = p.Encrypt(context.Background(), &pb.EncryptRequest{Plain: []byte("foo")})
 		p.healthCheck.recordErr(err)
 		if err != nil {
@@ -116,7 +117,10 @@ func (p *V1Plugin) Live() error {
 }
 
 // Version returns the V1Plugin server version
+//
+//nolint:staticcheck
 func (p *V1Plugin) Version(ctx context.Context, request *pb.VersionRequest) (*pb.VersionResponse, error) {
+	//nolint:staticcheck
 	return &pb.VersionResponse{
 		Version:        version.APIVersion,
 		RuntimeName:    version.Runtime,
@@ -125,6 +129,8 @@ func (p *V1Plugin) Version(ctx context.Context, request *pb.VersionRequest) (*pb
 }
 
 // Encrypt executes the encryption operation using AWS KMS
+//
+//nolint:staticcheck
 func (p *V1Plugin) Encrypt(ctx context.Context, request *pb.EncryptRequest) (*pb.EncryptResponse, error) {
 	zap.L().Debug("starting encrypt operation")
 
@@ -138,7 +144,7 @@ func (p *V1Plugin) Encrypt(ctx context.Context, request *pb.EncryptRequest) (*pb
 		input.EncryptionContext = p.encryptionCtx
 	}
 
-	result, err := p.svc.Encrypt(input)
+	result, err := p.svc.Encrypt(ctx, input)
 	if err != nil {
 		select {
 		case p.healthCheck.healthCheckErrc <- err:
@@ -154,10 +160,13 @@ func (p *V1Plugin) Encrypt(ctx context.Context, request *pb.EncryptRequest) (*pb
 	zap.L().Debug("encrypt operation successful")
 	kmsLatencyMetric.WithLabelValues(p.keyID, kmsplugin.StatusSuccess, kmsplugin.OperationEncrypt, GRPC_V1).Observe(kmsplugin.GetMillisecondsSince(startTime))
 	kmsOperationCounter.WithLabelValues(p.keyID, kmsplugin.StatusSuccess, kmsplugin.OperationEncrypt, GRPC_V1).Inc()
+	//nolint:staticcheck
 	return &pb.EncryptResponse{Cipher: append([]byte(kmsplugin.StorageVersion), result.CiphertextBlob...)}, nil
 }
 
 // Decrypt executes the decrypt operation using AWS KMS
+//
+//nolint:staticcheck
 func (p *V1Plugin) Decrypt(ctx context.Context, request *pb.DecryptRequest) (*pb.DecryptResponse, error) {
 	zap.L().Debug("starting decrypt operation")
 
@@ -173,7 +182,7 @@ func (p *V1Plugin) Decrypt(ctx context.Context, request *pb.DecryptRequest) (*pb
 		input.EncryptionContext = p.encryptionCtx
 	}
 
-	result, err := p.svc.Decrypt(input)
+	result, err := p.svc.Decrypt(ctx, input)
 	if err != nil {
 		select {
 		case p.healthCheck.healthCheckErrc <- err:
@@ -189,6 +198,7 @@ func (p *V1Plugin) Decrypt(ctx context.Context, request *pb.DecryptRequest) (*pb
 	zap.L().Debug("decrypt operation successful")
 	kmsLatencyMetric.WithLabelValues(p.keyID, kmsplugin.StatusSuccess, kmsplugin.OperationDecrypt, GRPC_V1).Observe(kmsplugin.GetMillisecondsSince(startTime))
 	kmsOperationCounter.WithLabelValues(p.keyID, kmsplugin.StatusSuccess, kmsplugin.OperationDecrypt, GRPC_V1).Inc()
+	//nolint:staticcheck
 	return &pb.DecryptResponse{Plain: result.Plaintext}, nil
 }
 
@@ -204,6 +214,7 @@ func WaitForReady(client pb.KeyManagementServiceClient, duration time.Duration) 
 	ctx, cancel := context.WithTimeout(context.Background(), duration)
 	defer cancel()
 
+	//nolint:staticcheck
 	_, err := client.Version(ctx, &pb.VersionRequest{}, grpc.WaitForReady(true))
 	if err != nil {
 		return err
