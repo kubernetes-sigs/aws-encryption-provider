@@ -1,8 +1,6 @@
 module sigs.k8s.io/aws-encryption-provider
 
-go 1.23.0
-
-toolchain go1.23.3
+go 1.23.4
 
 require (
 	github.com/aws/aws-sdk-go v1.54.6
