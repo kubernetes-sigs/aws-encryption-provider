@@ -156,6 +156,15 @@ func TestEncryptV2(t *testing.T) {
 			healthErr: true,
 			checkErr:  true,
 		},
+		{
+			input:     plainMessage,
+			ctx:       nil,
+			output:    "",
+			err:       awserr.New(kms.ErrCodeInternalException, "AWS KMS rejected the request because the external key store proxy did not respond in time. Retry the request. If you see this error repeatedly, report it to your external key store proxy administrator.", errors.New("fail")),
+			errType:   kmsplugin.KMSErrorTypeUserInduced,
+			healthErr: true,
+			checkErr:  false,
+		},
 	}
 
 	c := &cloud.KMSMock{}
