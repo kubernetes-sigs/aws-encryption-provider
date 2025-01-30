@@ -88,6 +88,11 @@ func ParseError(err error) (errorType KMSErrorType) {
 			strings.Contains(ev.Message(), "does not exist in this region") {
 			return KMSErrorTypeUserInduced
 		}
+	//Some times this error message is returned as part of  KMSInvalidStateException or KMSInternalException
+	case kms.ErrCodeInternalException:
+		if strings.Contains(ev.Message(), "AWS KMS rejected the request because the external key store proxy did not respond in time. Retry the request. If you see this error repeatedly, report it to your external key store proxy administrator") {
+			return KMSErrorTypeUserInduced
+		}
 	}
 
 	return KMSErrorTypeOther
