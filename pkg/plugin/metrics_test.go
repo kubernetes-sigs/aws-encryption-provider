@@ -84,6 +84,7 @@ func TestMetrics(t *testing.T) {
 
 			u := ts.URL + "/metrics"
 
+			//nolint:staticcheck
 			_, err := p.Encrypt(context.Background(), &pb.EncryptRequest{Plain: []byte("hello")})
 			if err != nil {
 				if entry.encryptErr == nil {

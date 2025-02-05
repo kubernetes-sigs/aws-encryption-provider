@@ -90,6 +90,7 @@ func newPlugin(
 func (p *V1Plugin) Health() error {
 	recent, err := p.healthCheck.isRecentlyChecked()
 	if !recent {
+		//nolint:staticcheck
 		_, err = p.Encrypt(context.Background(), &pb.EncryptRequest{Plain: []byte("foo")})
 		p.healthCheck.recordErr(err)
 		if err != nil {
@@ -116,7 +117,10 @@ func (p *V1Plugin) Live() error {
 }
 
 // Version returns the V1Plugin server version
+//
+//nolint:staticcheck
 func (p *V1Plugin) Version(ctx context.Context, request *pb.VersionRequest) (*pb.VersionResponse, error) {
+	//nolint:staticcheck
 	return &pb.VersionResponse{
 		Version:        version.APIVersion,
 		RuntimeName:    version.Runtime,
@@ -125,6 +129,8 @@ func (p *V1Plugin) Version(ctx context.Context, request *pb.VersionRequest) (*pb
 }
 
 // Encrypt executes the encryption operation using AWS KMS
+//
+//nolint:staticcheck
 func (p *V1Plugin) Encrypt(ctx context.Context, request *pb.EncryptRequest) (*pb.EncryptResponse, error) {
 	zap.L().Debug("starting encrypt operation")
 
@@ -154,10 +160,13 @@ func (p *V1Plugin) Encrypt(ctx context.Context, request *pb.EncryptRequest) (*pb
 	zap.L().Debug("encrypt operation successful")
 	kmsLatencyMetric.WithLabelValues(p.keyID, kmsplugin.StatusSuccess, kmsplugin.OperationEncrypt, GRPC_V1).Observe(kmsplugin.GetMillisecondsSince(startTime))
 	kmsOperationCounter.WithLabelValues(p.keyID, kmsplugin.StatusSuccess, kmsplugin.OperationEncrypt, GRPC_V1).Inc()
+	//nolint:staticcheck
 	return &pb.EncryptResponse{Cipher: append([]byte(kmsplugin.StorageVersion), result.CiphertextBlob...)}, nil
 }
 
 // Decrypt executes the decrypt operation using AWS KMS
+//
+//nolint:staticcheck
 func (p *V1Plugin) Decrypt(ctx context.Context, request *pb.DecryptRequest) (*pb.DecryptResponse, error) {
 	zap.L().Debug("starting decrypt operation")
 
@@ -189,6 +198,7 @@ func (p *V1Plugin) Decrypt(ctx context.Context, request *pb.DecryptRequest) (*pb
 	zap.L().Debug("decrypt operation successful")
 	kmsLatencyMetric.WithLabelValues(p.keyID, kmsplugin.StatusSuccess, kmsplugin.OperationDecrypt, GRPC_V1).Observe(kmsplugin.GetMillisecondsSince(startTime))
 	kmsOperationCounter.WithLabelValues(p.keyID, kmsplugin.StatusSuccess, kmsplugin.OperationDecrypt, GRPC_V1).Inc()
+	//nolint:staticcheck
 	return &pb.DecryptResponse{Plain: result.Plaintext}, nil
 }
 
@@ -204,6 +214,7 @@ func WaitForReady(client pb.KeyManagementServiceClient, duration time.Duration) 
 	ctx, cancel := context.WithTimeout(context.Background(), duration)
 	defer cancel()
 
+	//nolint:staticcheck
 	_, err := client.Version(ctx, &pb.VersionRequest{}, grpc.WaitForReady(true))
 	if err != nil {
 		return err
