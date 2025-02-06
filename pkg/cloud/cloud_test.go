@@ -72,10 +72,6 @@ func TestNewConfig(t *testing.T) {
 			expectErr: false,
 		},
 		{
-			name:      "missing region",
-			expectErr: true,
-		},
-		{
 			name:      "valid qps+burst override",
 			region:    "us-east-1",
 			qps:       1,

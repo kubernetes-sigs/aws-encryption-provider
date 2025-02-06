@@ -15,15 +15,15 @@ package cloud
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"go.uber.org/zap"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/aws/ratelimit"
 	"github.com/aws/aws-sdk-go-v2/aws/retry"
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/feature/ec2/imds"
 	"github.com/aws/aws-sdk-go-v2/service/kms"
+	"go.uber.org/zap"
 )
 
 type AWSKMSv2 interface {
@@ -46,10 +46,10 @@ func New(region, kmsEndpoint string, qps, burst, retryTokenCapacity int) (AWSKMS
 				o.RateLimiter = ratelimit.NewTokenRateLimit(uint(retryTokenCapacity))
 			})
 		}))
-	case qps > 0 || burst > 0:
+	case qps > 0:
 		zap.L().Info("--qps-limit and --burst-limit are deprecated, use --retry-token-capacity instead")
-		if qps+burst <= 0 {
-			return nil, errors.New("`--qps-limit`+`--burst-limit` must be greater than zero")
+		if burst <= 0 {
+			return nil, fmt.Errorf("burst expected >0, got %d", burst)
 		}
 		optFns = append(optFns, config.WithRetryer(func() aws.Retryer {
 			return retry.NewStandard(func(o *retry.StandardOptions) {
@@ -70,7 +70,12 @@ func New(region, kmsEndpoint string, qps, burst, retryTokenCapacity int) (AWSKMS
 	}
 
 	if cfg.Region == "" {
-		return nil, fmt.Errorf("unable to automatically detect region, specify explicitly with --region")
+		ec2 := imds.NewFromConfig(cfg)
+		region, err := ec2.GetRegion(context.Background(), &imds.GetRegionInput{})
+		if err != nil {
+			return nil, fmt.Errorf("failed to call the metadata server's region API, %v", err)
+		}
+		cfg.Region = region.Region
 	}
 
 	var kmsOptFns []func(*kms.Options)
