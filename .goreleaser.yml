@@ -1,4 +1,5 @@
 # Make sure to check the documentation at http://goreleaser.com
+version: 2
 builds:
   - id: aws-encryption-provider
     binary: aws-encryption-provider

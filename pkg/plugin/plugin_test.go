@@ -22,8 +22,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/service/kms"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	kmstypes "github.com/aws/aws-sdk-go-v2/service/kms/types"
+	"github.com/aws/smithy-go"
 	"go.uber.org/zap"
 	pb "k8s.io/kms/apis/v1beta1"
 	"sigs.k8s.io/aws-encryption-provider/pkg/cloud"
@@ -67,10 +68,14 @@ func TestEncrypt(t *testing.T) {
 			checkErr:  true,
 		},
 		{
-			input:     plainMessage,
-			ctx:       nil,
-			output:    "",
-			err:       awserr.New("RequestLimitExceeded", "test", errors.New("fail")),
+			input:  plainMessage,
+			ctx:    nil,
+			output: "",
+			err: &smithy.GenericAPIError{
+				Code:    "RequestLimitExceeded",
+				Message: "test",
+				Fault:   0,
+			},
 			errType:   kmsplugin.KMSErrorTypeThrottled,
 			healthErr: true,
 			checkErr:  true,
@@ -79,7 +84,7 @@ func TestEncrypt(t *testing.T) {
 			input:     plainMessage,
 			ctx:       nil,
 			output:    "",
-			err:       awserr.New(kms.ErrCodeInternalException, "test", errors.New("fail")),
+			err:       &kmstypes.KMSInternalException{Message: aws.String("test")},
 			errType:   kmsplugin.KMSErrorTypeOther,
 			healthErr: true,
 			checkErr:  true,
@@ -88,25 +93,33 @@ func TestEncrypt(t *testing.T) {
 			input:     plainMessage,
 			ctx:       nil,
 			output:    "",
-			err:       awserr.New(kms.ErrCodeLimitExceededException, "test", errors.New("fail")),
+			err:       &kmstypes.LimitExceededException{Message: aws.String("test")},
 			errType:   kmsplugin.KMSErrorTypeThrottled,
 			healthErr: true,
 			checkErr:  true,
 		},
 		{
-			input:     plainMessage,
-			ctx:       nil,
-			output:    "",
-			err:       awserr.New("AccessDeniedException", "The ciphertext refers to a customer master key that does not exist, does not exist in this region, or you are not allowed to access", errors.New("fail")),
+			input:  plainMessage,
+			ctx:    nil,
+			output: "",
+			err: &smithy.GenericAPIError{
+				Code:    "AccessDeniedException",
+				Message: "The ciphertext refers to a customer master key that does not exist, does not exist in this region, or you are not allowed to access",
+				Fault:   0,
+			},
 			errType:   kmsplugin.KMSErrorTypeUserInduced,
 			healthErr: true,
 			checkErr:  false,
 		},
 		{
-			input:     plainMessage,
-			ctx:       nil,
-			output:    "",
-			err:       awserr.New("AccessDeniedException", "Some other error message", errors.New("fail")),
+			input:  plainMessage,
+			ctx:    nil,
+			output: "",
+			err: &smithy.GenericAPIError{
+				Code:    "AccessDeniedException",
+				Message: "Some other error message",
+				Fault:   0,
+			},
 			errType:   kmsplugin.KMSErrorTypeOther,
 			healthErr: true,
 			checkErr:  true,
@@ -115,7 +128,7 @@ func TestEncrypt(t *testing.T) {
 			input:     plainMessage,
 			ctx:       nil,
 			output:    "",
-			err:       awserr.New(kms.ErrCodeDisabledException, "test", errors.New("fail")),
+			err:       &kmstypes.DisabledException{Message: aws.String("test")},
 			errType:   kmsplugin.KMSErrorTypeUserInduced,
 			healthErr: true,
 			checkErr:  false,
@@ -124,7 +137,7 @@ func TestEncrypt(t *testing.T) {
 			input:     plainMessage,
 			ctx:       nil,
 			output:    "",
-			err:       awserr.New(kms.ErrCodeInvalidStateException, "test", errors.New("fail")),
+			err:       &kmstypes.KMSInvalidStateException{Message: aws.String("test")},
 			errType:   kmsplugin.KMSErrorTypeUserInduced,
 			healthErr: true,
 			checkErr:  false,
@@ -133,7 +146,7 @@ func TestEncrypt(t *testing.T) {
 			input:     plainMessage,
 			ctx:       nil,
 			output:    "",
-			err:       awserr.New(kms.ErrCodeInvalidGrantIdException, "test", errors.New("fail")),
+			err:       &kmstypes.InvalidGrantIdException{Message: aws.String("test")},
 			errType:   kmsplugin.KMSErrorTypeUserInduced,
 			healthErr: true,
 			checkErr:  false,
@@ -142,7 +155,7 @@ func TestEncrypt(t *testing.T) {
 			input:     plainMessage,
 			ctx:       nil,
 			output:    "",
-			err:       awserr.New(kms.ErrCodeInvalidGrantTokenException, "test", errors.New("fail")),
+			err:       &kmstypes.InvalidGrantTokenException{Message: aws.String("test")},
 			errType:   kmsplugin.KMSErrorTypeUserInduced,
 			healthErr: true,
 			checkErr:  false,
