@@ -58,7 +58,7 @@ func TestMetrics(t *testing.T) {
 			s := server.New()
 			p.Register(s.Server)
 			defer func() {
-				s.Server.Stop()
+				s.Stop()
 				if err := <-errc; err != nil {
 					t.Fatalf("unexpected gRPC server stop error %v", err)
 				}

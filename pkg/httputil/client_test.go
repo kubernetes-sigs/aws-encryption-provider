@@ -129,6 +129,6 @@ func testHandler(w http.ResponseWriter, req *http.Request) {
 	case "GET":
 		fmt.Fprint(w, `test`)
 	default:
-		http.Error(w, "Method Not Allowed", 405)
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 	}
 }
