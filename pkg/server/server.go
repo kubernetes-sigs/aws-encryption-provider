@@ -53,5 +53,5 @@ func (s *Server) ListenAndServe(addr string) error {
 		return fmt.Errorf("failed to create listener: %v", err)
 	}
 
-	return s.Server.Serve(l)
+	return s.Serve(l)
 }

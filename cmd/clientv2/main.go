@@ -60,7 +60,7 @@ func main() {
 	for {
 		fmt.Print("->")
 		text, _ := reader.ReadString('\n')
-		text = strings.Replace(text, "\n", "", -1)
+		text = strings.ReplaceAll(text, "\n", "")
 
 		splits := strings.SplitN(text, " ", 2)
 

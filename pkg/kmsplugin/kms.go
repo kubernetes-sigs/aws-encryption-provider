@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/aws/request"
 	awsreq "github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/service/kms"
 	"go.uber.org/zap"
@@ -57,7 +56,7 @@ func ParseError(err error) (errorType KMSErrorType) {
 	}
 
 	zap.L().Debug("parsed error", zap.String("code", ev.Code()), zap.String("message", ev.Message()))
-	if request.IsErrorThrottle(uerr) {
+	if awsreq.IsErrorThrottle(uerr) {
 		return KMSErrorTypeThrottled
 	}
 	switch ev.Code() {

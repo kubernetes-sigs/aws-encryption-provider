@@ -73,7 +73,7 @@ func TestLivez(t *testing.T) {
 			s := server.New()
 			p.Register(s.Server)
 			defer func() {
-				s.Server.Stop()
+				s.Stop()
 				if err := <-errc; err != nil {
 					t.Fatalf("#%d: unexpected gRPC server stop error %v", i, err)
 				}
