@@ -14,40 +14,77 @@ limitations under the License.
 package cloud
 
 import (
+	"context"
 	"fmt"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/ec2metadata"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/kms"
-	"github.com/aws/aws-sdk-go/service/kms/kmsiface"
-	"sigs.k8s.io/aws-encryption-provider/pkg/httputil"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/aws/ratelimit"
+	"github.com/aws/aws-sdk-go-v2/aws/retry"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/feature/ec2/imds"
+	"github.com/aws/aws-sdk-go-v2/service/kms"
+	"go.uber.org/zap"
 )
 
-type AWSKMS struct {
-	kmsiface.KMSAPI
+type AWSKMSv2 interface {
+	Encrypt(ctx context.Context, params *kms.EncryptInput, optFns ...func(*kms.Options)) (*kms.EncryptOutput, error)
+	Decrypt(ctx context.Context, params *kms.DecryptInput, optFns ...func(*kms.Options)) (*kms.DecryptOutput, error)
 }
 
-func New(region, kmsEndpoint string, qps, burst int) (*AWSKMS, error) {
-	sess, err := session.NewSession()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create new session: %w", err)
+func New(region, kmsEndpoint string, qps, burst, retryTokenCapacity int) (AWSKMSv2, error) {
+	var optFns []func(*config.LoadOptions) error
+	if region != "" {
+		optFns = append(optFns, config.WithRegion(region))
 	}
-	if region == "" {
-		region, err = ec2metadata.New(sess).Region()
+
+	switch {
+	// Use --retry-token-capacity's value if set, --qps-limit and --burst-limit are deprecated.
+	// https://docs.aws.amazon.com/sdk-for-go/v2/developer-guide/configure-retries-timeouts.html (Client-side rate limiting)
+	case retryTokenCapacity > 0:
+		optFns = append(optFns, config.WithRetryer(func() aws.Retryer {
+			return retry.NewStandard(func(o *retry.StandardOptions) {
+				o.RateLimiter = ratelimit.NewTokenRateLimit(uint(retryTokenCapacity))
+			})
+		}))
+	case qps > 0:
+		zap.L().Info("--qps-limit and --burst-limit are deprecated, use --retry-token-capacity instead")
+		if burst <= 0 {
+			return nil, fmt.Errorf("burst expected >0, got %d", burst)
+		}
+		optFns = append(optFns, config.WithRetryer(func() aws.Retryer {
+			return retry.NewStandard(func(o *retry.StandardOptions) {
+				// Attempt to set a "reasonable" value from the previous intent of --qps-limit and --burst-limit.
+				// In aws-sdk-go-v2, client-side rate limits only apply on retries, with varying token cost depending
+				// on the type of retry. However, --qps-limit and --burst-limit used to apply to all requests, so set
+				// all retry costs to a flat value of 1 until these flags are fully deprecated
+				o.RateLimiter = ratelimit.NewTokenRateLimit(uint(qps) + uint(burst))
+				o.RetryCost = 1
+				o.RetryTimeoutCost = 1
+			})
+		}))
+	}
+
+	cfg, err := config.LoadDefaultConfig(context.Background(), optFns...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create AWS config: %w", err)
+	}
+
+	if cfg.Region == "" {
+		ec2 := imds.NewFromConfig(cfg)
+		region, err := ec2.GetRegion(context.Background(), &imds.GetRegionInput{})
 		if err != nil {
 			return nil, fmt.Errorf("failed to call the metadata server's region API, %v", err)
 		}
+		cfg.Region = region.Region
 	}
-	cfg := &aws.Config{
-		Region:                        aws.String(region),
-		CredentialsChainVerboseErrors: aws.Bool(true),
-		Endpoint:                      aws.String(kmsEndpoint),
+
+	var kmsOptFns []func(*kms.Options)
+	if kmsEndpoint != "" {
+		kmsOptFns = append(kmsOptFns, func(o *kms.Options) {
+			o.BaseEndpoint = aws.String(kmsEndpoint)
+		})
 	}
-	if qps > 0 {
-		if sess.Config.HTTPClient, err = httputil.NewRateLimitedClient(qps, burst); err != nil {
-			return nil, err
-		}
-	}
-	return &AWSKMS{kms.New(sess, cfg)}, nil
+
+	client := kms.NewFromConfig(cfg, kmsOptFns...)
+	return client, nil
 }

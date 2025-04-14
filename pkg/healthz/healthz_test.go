@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/service/kms"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	kmstypes "github.com/aws/aws-sdk-go-v2/service/kms/types"
 	"go.uber.org/zap"
 	"sigs.k8s.io/aws-encryption-provider/pkg/cloud"
 	"sigs.k8s.io/aws-encryption-provider/pkg/plugin"
@@ -42,18 +42,18 @@ func TestHealthz(t *testing.T) {
 
 		{
 			path:          "/test-healthz-fail-with-internal-error",
-			kmsEncryptErr: awserr.New(kms.ErrCodeInternalException, "test", errors.New("fail")),
+			kmsEncryptErr: &kmstypes.KMSInternalException{Message: aws.String("test")},
 			shouldSucceed: false,
 		},
 		// user-induced errors should still fail "/healthz"
 		{
 			path:          "/test-healthz-fail-with-user-induced-invalid-key-state",
-			kmsEncryptErr: awserr.New(kms.ErrCodeInvalidStateException, "test", errors.New("fail")),
+			kmsEncryptErr: &kmstypes.KMSInvalidStateException{Message: aws.String("test")},
 			shouldSucceed: false,
 		},
 		{
 			path:          "/test-healthz-fail-with-user-induced-invalid-grant",
-			kmsEncryptErr: awserr.New(kms.ErrCodeInvalidGrantTokenException, "test", errors.New("fail")),
+			kmsEncryptErr: &kmstypes.InvalidGrantTokenException{Message: aws.String("test")},
 			shouldSucceed: false,
 		},
 	}
