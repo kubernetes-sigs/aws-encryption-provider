@@ -46,7 +46,7 @@ func TestMetrics(t *testing.T) {
 	for i, entry := range tt {
 		t.Run(entry.key, func(t *testing.T) {
 			addr := filepath.Join(os.TempDir(), fmt.Sprintf("metrics%x", rand.Int63()))
-			defer os.RemoveAll(addr)
+			defer os.RemoveAll(addr) //nolint:errcheck
 
 			c := &cloud.KMSMock{}
 			c.SetEncryptResp("test", entry.encryptErr)
@@ -59,7 +59,7 @@ func TestMetrics(t *testing.T) {
 			s := server.New()
 			p.Register(s.Server)
 			defer func() {
-				s.Server.Stop()
+				s.Stop()
 				if err := <-errc; err != nil {
 					t.Fatalf("unexpected gRPC server stop error %v", err)
 				}
@@ -100,7 +100,7 @@ func TestMetrics(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer resp.Body.Close()
+			defer resp.Body.Close() //nolint:errcheck
 			d, err := io.ReadAll(resp.Body)
 			if err != nil {
 				t.Fatal(err)

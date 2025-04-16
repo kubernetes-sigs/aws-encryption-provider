@@ -1,6 +1,7 @@
 package server
 
 import (
+	"errors"
 	"log"
 	"os"
 	"testing"
@@ -15,7 +16,7 @@ func TestListenAndServe(t *testing.T) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer os.RemoveAll(dir) // clean up
+	defer os.RemoveAll(dir) //nolint:errcheck
 	tt := []struct {
 		addr   string
 		retErr error
@@ -37,7 +38,10 @@ func TestListenAndServe(t *testing.T) {
 		t.Run(entry.addr, func(t *testing.T) {
 			ch := make(chan error, 1)
 			s := New()
-			os.Remove(entry.addr)
+			err := os.Remove(entry.addr) //nolint:errcheck
+			if err != nil && !errors.Is(err, os.ErrNotExist) {
+				t.Errorf("error removing the file %v", err)
+			}
 			if entry.addr == (dir + "/fileExists.sock") {
 				_, err := os.Create(entry.addr)
 				if err != nil {

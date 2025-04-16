@@ -24,7 +24,10 @@ func (hd *handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		err := p.Health()
 		if err != nil {
 			rw.WriteHeader(http.StatusInternalServerError)
-			fmt.Fprint(rw, err)
+			_, e := fmt.Fprint(rw, err)
+			if e != nil {
+				zap.L().Error("error writing response", zap.Error(e))
+			}
 			zap.L().Error("health check failed", zap.Error(err))
 			return
 		}
@@ -33,12 +36,18 @@ func (hd *handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		err := p.Health()
 		if err != nil {
 			rw.WriteHeader(http.StatusInternalServerError)
-			fmt.Fprint(rw, err)
+			_, e := fmt.Fprint(rw, err)
+			if e != nil {
+				zap.L().Error("error writing response", zap.Error(e))
+			}
 			zap.L().Error("health check failed", zap.Error(err))
 			return
 		}
 	}
 	rw.WriteHeader(http.StatusOK)
-	fmt.Fprint(rw, http.StatusText(http.StatusOK))
+	_, e := fmt.Fprint(rw, http.StatusText(http.StatusOK))
+	if e != nil {
+		zap.L().Error("error writing response", zap.Error(e))
+	}
 	zap.L().Debug("health check success")
 }

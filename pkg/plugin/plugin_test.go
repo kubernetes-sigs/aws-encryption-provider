@@ -24,7 +24,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	kmstypes "github.com/aws/aws-sdk-go-v2/service/kms/types"
-	"github.com/aws/smithy-go"
+	smithy "github.com/aws/smithy-go"
 	"go.uber.org/zap"
 	pb "k8s.io/kms/apis/v1beta1"
 	"sigs.k8s.io/aws-encryption-provider/pkg/cloud"
