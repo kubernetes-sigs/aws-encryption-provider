@@ -8,7 +8,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/aws/retry"
 	kmstypes "github.com/aws/aws-sdk-go-v2/service/kms/types"
-	"github.com/aws/smithy-go"
+	smithy "github.com/aws/smithy-go"
 	"go.uber.org/zap"
 )
 

@@ -33,9 +33,9 @@ func TestNewSessionClientWithoutEnv(t *testing.T) {
 func TestNewSessionClientWithEnv(t *testing.T) {
 	tempFile, err := createTmpFile(TLSBundleCert)
 	assert.NoError(t, err, "Temporary file creation with CA bundle data is failing")
-	defer os.Remove(tempFile)
-	os.Setenv("AWS_CA_BUNDLE", tempFile)
-	defer os.Unsetenv("AWS_CA_BUNDLE")
+	defer os.Remove(tempFile)            //nolint:errcheck
+	os.Setenv("AWS_CA_BUNDLE", tempFile) //nolint:errcheck
+	defer os.Unsetenv("AWS_CA_BUNDLE")   //nolint:errcheck
 	kmsObjet, err := New("us-west-2", "https://kms.us-west-2.amazonaws.com", 0, 0, 500)
 	assert.NoError(t, err, "Failed to create object with error (%v)", err)
 	assert.NotNil(t, kmsObjet, "Failed to create object with error (%v)", err)
@@ -52,7 +52,7 @@ func createTmpFile(b []byte) (string, error) {
 		return "", err
 	}
 
-	defer bundleFile.Close()
+	defer bundleFile.Close() //nolint:errcheck
 	return bundleFile.Name(), nil
 }
 

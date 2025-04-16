@@ -60,7 +60,7 @@ func TestLivez(t *testing.T) {
 	for i, entry := range tt {
 		t.Run(entry.path, func(t *testing.T) {
 			addr := filepath.Join(os.TempDir(), fmt.Sprintf("livez%x", rand.Int63()))
-			defer os.RemoveAll(addr)
+			defer os.RemoveAll(addr) //nolint:errcheck
 
 			c := &cloud.KMSMock{}
 			c.SetEncryptResp("test", entry.kmsEncryptErr)
@@ -73,7 +73,7 @@ func TestLivez(t *testing.T) {
 			s := server.New()
 			p.Register(s.Server)
 			defer func() {
-				s.Server.Stop()
+				s.Stop()
 				if err := <-errc; err != nil {
 					t.Fatalf("#%d: unexpected gRPC server stop error %v", i, err)
 				}
@@ -105,7 +105,7 @@ func TestLivez(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer resp.Body.Close()
+			defer resp.Body.Close() //nolint:errcheck
 			d, err := io.ReadAll(resp.Body)
 			if err != nil {
 				t.Fatal(err)
