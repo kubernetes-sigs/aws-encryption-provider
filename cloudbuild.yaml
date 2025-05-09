@@ -9,6 +9,7 @@ steps:
     entrypoint: make
     env:
       - REPO=us-central1-docker.pkg.dev/k8s-staging-images/aws-encryption-provider
+      - IMAGE=aws-encryption-provider
       - TAG=$_GIT_TAG
     args:
       - build-docker
