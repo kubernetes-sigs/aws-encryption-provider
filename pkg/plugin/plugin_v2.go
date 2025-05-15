@@ -144,8 +144,9 @@ func (p *V2Plugin) Encrypt(ctx context.Context, request *pb.EncryptRequest) (*pb
 		case p.healthCheck.healthCheckErrc <- err:
 		default:
 		}
-		zap.L().Error("request to encrypt failed", zap.String("error-type", kmsplugin.ParseError(err).String()), zap.Error(err))
-		failLabel := kmsplugin.GetStatusLabel(err)
+		errorType := kmsplugin.ParseError(err).String()
+		zap.L().Error("request to encrypt failed", zap.String("error-type", errorType), zap.Error(err))
+		failLabel := kmsplugin.GetStatusLabel(err, errorType)
 		kmsLatencyMetric.WithLabelValues(p.keyID, failLabel, kmsplugin.OperationEncrypt, GRPC_V2).Observe(kmsplugin.GetMillisecondsSince(startTime))
 		kmsOperationCounter.WithLabelValues(p.keyID, failLabel, kmsplugin.OperationEncrypt, GRPC_V2).Inc()
 		return nil, fmt.Errorf("failed to encrypt %w", err)
@@ -183,12 +184,12 @@ func (p *V2Plugin) Decrypt(ctx context.Context, request *pb.DecryptRequest) (*pb
 
 	result, err := p.svc.Decrypt(ctx, input)
 	if err != nil {
-		select {
-		case p.healthCheck.healthCheckErrc <- err:
-		default:
+		errorType := kmsplugin.ParseError(err).String()
+		if errorType != kmsplugin.KMSErrorTypeCorruption.String() {
+			p.healthCheck.healthCheckErrc <- err
 		}
-		zap.L().Error("request to decrypt failed", zap.String("error-type", kmsplugin.ParseError(err).String()), zap.Error(err))
-		failLabel := kmsplugin.GetStatusLabel(err)
+		zap.L().Error("request to decrypt failed", zap.String("error-type", errorType), zap.Error(err))
+		failLabel := kmsplugin.GetStatusLabel(err, errorType)
 		kmsLatencyMetric.WithLabelValues(p.keyID, failLabel, kmsplugin.OperationDecrypt, GRPC_V2).Observe(kmsplugin.GetMillisecondsSince(startTime))
 		kmsOperationCounter.WithLabelValues(p.keyID, failLabel, kmsplugin.OperationDecrypt, GRPC_V2).Inc()
 		return nil, fmt.Errorf("failed to decrypt %w", err)

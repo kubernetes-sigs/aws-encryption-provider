@@ -18,6 +18,7 @@ const (
 	KMSErrorTypeNil = KMSErrorType(iota)
 	KMSErrorTypeUserInduced
 	KMSErrorTypeThrottled
+	KMSErrorTypeCorruption
 	KMSErrorTypeOther
 )
 
@@ -31,6 +32,8 @@ func (t KMSErrorType) String() string {
 		return "throttled"
 	case KMSErrorTypeOther:
 		return "other"
+	case KMSErrorTypeCorruption:
+		return "corruption"
 	default:
 		return ""
 	}
@@ -77,6 +80,9 @@ func ParseError(err error) (errorType KMSErrorType) {
 	// ref. https://docs.aws.amazon.com/kms/latest/developerguide/requests-per-second.html
 	case (&kmstypes.LimitExceededException{}).ErrorCode():
 		return KMSErrorTypeThrottled
+	
+	case (&kmstypes.InvalidCiphertextException{}).ErrorCode():
+		return KMSErrorTypeCorruption
 
 	// AWS SDK Go for KMS does not "yet" define specific error code for a case where a customer specifies the deleted key
 	// "AccessDeniedException" error code may be returned when (1) CMK does not exist (not pending delete),
@@ -100,11 +106,12 @@ func ParseError(err error) (errorType KMSErrorType) {
 }
 
 const (
-	StatusSuccess         = "success"
-	StatusFailure         = "failure"
-	StatusFailureThrottle = "failure-throttle"
-	OperationEncrypt      = "encrypt"
-	OperationDecrypt      = "decrypt"
+	StatusSuccess           = "success"
+	StatusFailure           = "failure"
+	StatusFailureThrottle   = "failure-throttle"
+	StatusFailureCorruption = "failure-corruption"
+	OperationEncrypt        = "encrypt"
+	OperationDecrypt        = "decrypt"
 )
 
 // StorageVersion is a prefix used for versioning encrypted content
@@ -126,13 +133,15 @@ func GetMillisecondsSince(startTime time.Time) float64 {
 	return float64(time.Since(startTime).Milliseconds())
 }
 
-func GetStatusLabel(err error) string {
+func GetStatusLabel(err error, errorType string) string {
 	var defaultCodes retry.IsErrorThrottles = retry.DefaultThrottles
 	switch {
 	case err == nil:
 		return StatusSuccess
 	case defaultCodes.IsErrorThrottle(err) == aws.TrueTernary:
 		return StatusFailureThrottle
+	case errorType == KMSErrorTypeCorruption.String():
+		return StatusFailureCorruption
 	default:
 		return StatusFailure
 	}
