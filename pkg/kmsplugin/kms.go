@@ -80,7 +80,7 @@ func ParseError(err error) (errorType KMSErrorType) {
 	// ref. https://docs.aws.amazon.com/kms/latest/developerguide/requests-per-second.html
 	case (&kmstypes.LimitExceededException{}).ErrorCode():
 		return KMSErrorTypeThrottled
-	
+
 	case (&kmstypes.InvalidCiphertextException{}).ErrorCode():
 		return KMSErrorTypeCorruption
 
