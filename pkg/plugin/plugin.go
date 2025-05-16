@@ -187,7 +187,10 @@ func (p *V1Plugin) Decrypt(ctx context.Context, request *pb.DecryptRequest) (*pb
 	if err != nil {
 		errorType := kmsplugin.ParseError(err).String()
 		if errorType != kmsplugin.KMSErrorTypeCorruption.String() {
-			p.healthCheck.healthCheckErrc <- err
+			select {
+			case p.healthCheck.healthCheckErrc <- err:
+			default:
+			}
 		}
 		zap.L().Error("request to decrypt failed", zap.String("error-type", errorType), zap.Error(err))
 		failLabel := kmsplugin.GetStatusLabel(err, errorType)
