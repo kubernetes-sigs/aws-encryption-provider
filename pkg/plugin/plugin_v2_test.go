@@ -178,6 +178,15 @@ func TestEncryptV2(t *testing.T) {
 			healthErr: true,
 			checkErr:  false,
 		},
+		{
+			input:     plainMessage,
+			ctx:       nil,
+			output:    "",
+			err:       &kmstypes.InvalidCiphertextException{Message: aws.String("InvalidCipherException:")},
+			errType:   kmsplugin.KMSErrorTypeCorruption,
+			healthErr: true,
+			checkErr:  true,
+		},
 	}
 
 	c := &cloud.KMSMock{}
@@ -293,16 +302,24 @@ func TestHealthV2(t *testing.T) {
 	zap.ReplaceGlobals(zap.NewExample())
 
 	tt := []struct {
-		encryptErr error
-		decryptErr error
+		encryptErr       error
+		decryptErr       error
+		decryptHealthErr bool
 	}{
 		{
-			encryptErr: nil,
-			decryptErr: nil,
+			encryptErr:       nil,
+			decryptErr:       nil,
+			decryptHealthErr: false,
 		},
 		{
-			encryptErr: errors.New("encrypt fail"),
-			decryptErr: errors.New("decrypt fail"),
+			encryptErr:       errors.New("encrypt fail"),
+			decryptErr:       errors.New("decrypt fail"),
+			decryptHealthErr: true,
+		},
+		{
+			encryptErr:       nil,
+			decryptErr:       &kmstypes.InvalidCiphertextException{Message: aws.String("InvalidCipherException:")},
+			decryptHealthErr: false,
 		},
 	}
 	for idx, entry := range tt {
@@ -335,7 +352,7 @@ func TestHealthV2(t *testing.T) {
 			t.Fatalf("#%d: unexpected error from Encrypt %v", idx, decErr)
 		}
 		herr2 := p.Health()
-		if entry.decryptErr == nil {
+		if !entry.decryptHealthErr {
 			if herr2 != nil {
 				t.Fatalf("#%d: unexpected error from Health %v", idx, herr2)
 			}
