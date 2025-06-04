@@ -89,10 +89,16 @@ func newPluginV2(
 func (p *V2Plugin) Health() error {
 	recent, err := p.healthCheck.isRecentlyChecked()
 	if !recent {
-		_, err = p.Encrypt(context.Background(), &pb.EncryptRequest{Plaintext: []byte("foo")})
+		encResult, err := p.Encrypt(context.Background(), &pb.EncryptRequest{Plaintext: []byte("foo")})
 		p.healthCheck.recordErr(err)
 		if err != nil {
-			zap.L().Warn("health check failed", zap.Error(err))
+			zap.L().Warn("health check failed at encryption", zap.Error(err))
+			return err
+		}
+		_, err = p.Decrypt(context.Background(), &pb.DecryptRequest{Ciphertext: encResult.Ciphertext})
+		p.healthCheck.recordErr(err)
+		if err != nil {
+			zap.L().Warn("health check failed at decryption", zap.Error(err))
 		}
 		return err
 	}
