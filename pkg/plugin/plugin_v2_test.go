@@ -22,8 +22,9 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/kms"
 	kmstypes "github.com/aws/aws-sdk-go-v2/service/kms/types"
-	smithy "github.com/aws/smithy-go"
+	"github.com/aws/smithy-go"
 	"go.uber.org/zap"
 	pb "k8s.io/kms/apis/v2"
 	"sigs.k8s.io/aws-encryption-provider/pkg/cloud"
@@ -193,15 +194,7 @@ func TestEncryptV2(t *testing.T) {
 	ctx := context.Background()
 
 	for idx, tc := range tt {
-		func() {
-			c.SetEncryptResp(tc.output, tc.err)
-			sharedHealthCheck := NewSharedHealthCheck(DefaultHealthCheckPeriod, DefaultErrcBufSize)
-			go sharedHealthCheck.Start()
-			p := NewV2(key, c, nil, sharedHealthCheck)
-			defer func() {
-				sharedHealthCheck.Stop()
-			}()
-
+		encryptTestFunc := func(p *V2Plugin) {
 			eReq := &pb.EncryptRequest{Plaintext: []byte(tc.input)}
 			eRes, err := p.Encrypt(ctx, eReq)
 
@@ -221,23 +214,58 @@ func TestEncryptV2(t *testing.T) {
 			if !reflect.DeepEqual(tc.errType, et) {
 				t.Fatalf("#%d: expected error type %s, got %s", idx, tc.errType, et)
 			}
+		}
+		decryptTestFunc := func(p *V2Plugin) {
+			dReq := &pb.DecryptRequest{Ciphertext: []byte(kmsplugin.StorageVersion + tc.output)}
+			dRes, err := p.Decrypt(ctx, dReq)
 
-			herr := p.Health()
-			if tc.healthErr && herr == nil {
-				t.Fatalf("#%d: expected health error, but got nil", idx)
-			}
-			if !tc.healthErr && herr != nil {
-				t.Fatalf("#%d: unexpected health error, got %v", idx, herr)
+			if tc.err != nil && err == nil {
+				t.Fatalf("#%d: failed to return expected error %v", idx, tc.err)
 			}
 
-			cerr := p.Live()
-			if tc.checkErr && cerr == nil {
-				t.Fatalf("#%d: expected check error, but got nil", idx)
+			if tc.err == nil && err != nil {
+				t.Fatalf("#%d: returned unexpected error: %v", idx, err)
 			}
-			if !tc.checkErr && cerr != nil {
-				t.Fatalf("#%d: unexpected check error, got %v", idx, cerr)
+
+			if tc.err == nil && string(dRes.Plaintext) != tc.input {
+				t.Fatalf("#%d: expected %s, but got %s", idx, tc.input, string(dRes.Plaintext))
 			}
-		}()
+
+			et := kmsplugin.ParseError(tc.err)
+			if !reflect.DeepEqual(tc.errType, et) {
+				t.Fatalf("#%d: expected error type %s, got %s", idx, tc.errType, et)
+			}
+		}
+
+		for _, tf := range []func(p *V2Plugin){encryptTestFunc, decryptTestFunc} {
+			func() {
+				c.SetEncryptResp(tc.output, tc.err)
+				c.SetDecryptResp(tc.input, tc.err)
+				sharedHealthCheck := NewSharedHealthCheck(DefaultHealthCheckPeriod, DefaultErrcBufSize)
+				go sharedHealthCheck.Start()
+				p := NewV2(key, c, nil, sharedHealthCheck)
+				defer func() {
+					sharedHealthCheck.Stop()
+				}()
+				tf(p)
+
+				herr := p.Health()
+				if tc.healthErr && herr == nil {
+					t.Fatalf("#%d: expected health error, but got nil", idx)
+				}
+				if !tc.healthErr && herr != nil {
+					t.Fatalf("#%d: unexpected health error, got %v", idx, herr)
+				}
+
+				cerr := p.Live()
+				if tc.checkErr && cerr == nil {
+					t.Fatalf("#%d: expected check error, but got nil", idx)
+				}
+				if !tc.checkErr && cerr != nil {
+					t.Fatalf("#%d: unexpected check error, got %v", idx, cerr)
+				}
+			}()
+		}
 	}
 }
 func TestDecryptV2(t *testing.T) {
@@ -299,6 +327,8 @@ func TestDecryptV2(t *testing.T) {
 }
 
 func TestHealthV2(t *testing.T) {
+	plain := "input-text1"
+	cipher := "output-text1"
 	zap.ReplaceGlobals(zap.NewExample())
 
 	tt := []struct {
@@ -331,10 +361,16 @@ func TestHealthV2(t *testing.T) {
 			sharedHealthCheck.Stop()
 		}()
 
-		c.SetEncryptResp("foo", entry.encryptErr)
-		c.SetDecryptResp("foo", entry.decryptErr)
+		c.SetEncryptResp(cipher, entry.encryptErr)
+		c.SetDecryptResp(plain, entry.decryptErr)
+		c.AddEncryptRule(func(params *kms.EncryptInput) bool {
+			return string(params.Plaintext) == "foo"
+		}, "foo", nil)
+		c.AddDecryptRule(func(params *kms.DecryptInput) bool {
+			return string(params.CiphertextBlob) == "foo"
+		}, "foo", nil)
 
-		_, encErr := p.Encrypt(context.Background(), &pb.EncryptRequest{Plaintext: []byte("foo")})
+		_, encErr := p.Encrypt(context.Background(), &pb.EncryptRequest{Plaintext: []byte(plain)})
 		if entry.encryptErr == nil && encErr != nil {
 			t.Fatalf("#%d: unexpected error from Encrypt %v", idx, encErr)
 		}
@@ -356,7 +392,7 @@ func TestHealthV2(t *testing.T) {
 			if herr2 != nil {
 				t.Fatalf("#%d: unexpected error from Health %v", idx, herr2)
 			}
-		} else if !strings.HasSuffix(decErr.Error(), entry.decryptErr.Error()) {
+		} else if decErr != nil && !strings.HasSuffix(decErr.Error(), entry.decryptErr.Error()) {
 			t.Fatalf("#%d: unexpected error from Health %v", idx, herr2)
 		}
 	}
