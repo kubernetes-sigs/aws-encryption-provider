@@ -8,8 +8,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-ARG BUILDER=public.ecr.aws/eks-distro-build-tooling/golang:1.24.2-gcc
-ARG BASE_IMAGE=public.ecr.aws/eks-distro/kubernetes/go-runner:v0.18.0-eks-1-32-latest
+ARG BUILDER=public.ecr.aws/eks-distro-build-tooling/golang:1.24.4-gcc
+ARG BASE_IMAGE=public.ecr.aws/eks-distro/kubernetes/go-runner:v0.18.0-eks-1-33-latest
 
 FROM --platform=$BUILDPLATFORM ${BUILDER} AS build
 WORKDIR /go/src/sigs.k8s.io/aws-encryption-provider
