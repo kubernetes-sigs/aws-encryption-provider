@@ -89,10 +89,10 @@ func ParseError(err error) (errorType KMSErrorType) {
 	// or (2) corresponding IAM role is not allowed to access the key.
 	// Thus we only want to mark "AccessDeniedException" as user-induced for the case (1).
 	// e.g., "AccessDeniedException: The ciphertext refers to a customer master key that does not exist, does not exist in this region, or you are not allowed to access."
+	//       or "AccessDeniedException: User xxx is not authorized to perform: xxx on this resource because the resource does not exist in this Region, no resource-based policies allow access, or a resource-based policy explicitly denies access"
 	// KMS service may change the error message, so we do the string match.
 	case "AccessDeniedException":
-		if strings.Contains(ae.ErrorMessage(), "customer master key that does not exist") ||
-			strings.Contains(ae.ErrorMessage(), "does not exist in this region") {
+		if strings.Contains(ae.ErrorMessage(), "does not exist") {
 			return KMSErrorTypeUserInduced
 		}
 	// Sometimes this error message is returned as part of KMSInvalidStateException or KMSInternalException
