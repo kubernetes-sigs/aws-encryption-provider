@@ -1,6 +1,7 @@
 package kmsplugin
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -116,6 +117,11 @@ func TestParseError(t *testing.T) {
 			name:     "wrapped other error",
 			err:      errors.New("wrapped: " + (&mockAPIError{code: (&types.DisabledException{}).ErrorCode()}).Error()),
 			expected: KMSErrorTypeOther,
+		},
+		{
+			name:     "context cancelled",
+			err:      context.Canceled,
+			expected: KMSErrorTypeUserInduced,
 		},
 	}
 

@@ -1,6 +1,7 @@
 package livez
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -25,36 +26,60 @@ func TestLivez(t *testing.T) {
 	zap.ReplaceGlobals(zap.NewExample())
 
 	tt := []struct {
-		path          string
-		kmsEncryptErr error
-		shouldSucceed bool
+		path           string
+		kmsEncryptErr  error
+		shouldSucceed  bool
+		healthCheckErr error
 	}{
 		{
-			path:          "/test-livez-default",
-			kmsEncryptErr: nil,
-			shouldSucceed: true,
+			path:           "/test-livez-default",
+			kmsEncryptErr:  nil,
+			healthCheckErr: nil,
+			shouldSucceed:  true,
 		},
 		{
-			path:          "/test-livez-fail",
-			kmsEncryptErr: errors.New("fail encrypt"),
-			shouldSucceed: false,
+			path:           "/test-livez-fail",
+			kmsEncryptErr:  errors.New("fail encrypt"),
+			healthCheckErr: nil,
+			shouldSucceed:  false,
 		},
 		{
-			path:          "/test-livez-fail-with-internal-error",
-			kmsEncryptErr: &kmstypes.KMSInternalException{Message: aws.String("test")},
-			shouldSucceed: false,
+			path:           "/test-livez-fail-with-internal-error",
+			kmsEncryptErr:  &kmstypes.KMSInternalException{Message: aws.String("test")},
+			healthCheckErr: nil,
+			shouldSucceed:  false,
+		},
+		{
+			path:           "/test-livez-fail-with-internal-error-cached",
+			kmsEncryptErr:  nil,
+			healthCheckErr: &kmstypes.KMSInternalException{Message: aws.String("test")},
+			shouldSucceed:  false,
 		},
 
 		// user-induced
 		{
-			path:          "/test-livez-fail-with-user-induced-invalid-key-state",
-			kmsEncryptErr: &kmstypes.KMSInvalidStateException{Message: aws.String("test")},
-			shouldSucceed: true,
+			path:           "/test-livez-fail-with-user-induced-invalid-key-state",
+			kmsEncryptErr:  &kmstypes.KMSInvalidStateException{Message: aws.String("test")},
+			healthCheckErr: nil,
+			shouldSucceed:  true,
 		},
 		{
-			path:          "/test-livez-fail-with-user-induced-invalid-grant",
-			kmsEncryptErr: &kmstypes.InvalidGrantTokenException{Message: aws.String("test")},
-			shouldSucceed: true,
+			path:           "/test-livez-fail-with-user-induced-invalid-grant",
+			kmsEncryptErr:  &kmstypes.InvalidGrantTokenException{Message: aws.String("test")},
+			healthCheckErr: nil,
+			shouldSucceed:  true,
+		},
+		{
+			path:           "/test-livez-fail-with-context-cancelled",
+			kmsEncryptErr:  context.Canceled,
+			healthCheckErr: nil,
+			shouldSucceed:  true,
+		},
+		{
+			path:           "/test-livez-fail-with-context-cancelled-cached",
+			kmsEncryptErr:  nil,
+			healthCheckErr: context.Canceled,
+			shouldSucceed:  true,
 		},
 	}
 	for i, entry := range tt {
@@ -99,6 +124,9 @@ func TestLivez(t *testing.T) {
 			ts := httptest.NewServer(mux)
 			defer ts.Close()
 
+			if entry.healthCheckErr != nil {
+				sharedHealthCheck.RecordErr(entry.healthCheckErr)
+			}
 			u := ts.URL + entry.path
 
 			resp, err := http.Get(u)

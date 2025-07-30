@@ -92,7 +92,7 @@ func (p *V1Plugin) Health() error {
 	if !recent {
 		//nolint:staticcheck
 		_, err = p.Encrypt(context.Background(), &pb.EncryptRequest{Plain: []byte("foo")})
-		p.healthCheck.recordErr(err)
+		p.healthCheck.RecordErr(err)
 		if err != nil {
 			zap.L().Warn("health check failed", zap.Error(err))
 		}
