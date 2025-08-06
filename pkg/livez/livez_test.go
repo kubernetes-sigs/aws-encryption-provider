@@ -56,6 +56,11 @@ func TestLivez(t *testing.T) {
 			kmsEncryptErr: &kmstypes.InvalidGrantTokenException{Message: aws.String("test")},
 			shouldSucceed: true,
 		},
+		{
+			path:          "/test-livez-fail-with-user-induced-throttled",
+			kmsEncryptErr: &kmstypes.LimitExceededException{Message: aws.String("test")},
+			shouldSucceed: true,
+		},
 	}
 	for i, entry := range tt {
 		t.Run(entry.path, func(t *testing.T) {

@@ -78,7 +78,7 @@ func TestEncrypt(t *testing.T) {
 			},
 			errType:   kmsplugin.KMSErrorTypeThrottled,
 			healthErr: true,
-			checkErr:  true,
+			checkErr:  false,
 		},
 		{
 			input:     plainMessage,
@@ -96,7 +96,7 @@ func TestEncrypt(t *testing.T) {
 			err:       &kmstypes.LimitExceededException{Message: aws.String("test")},
 			errType:   kmsplugin.KMSErrorTypeThrottled,
 			healthErr: true,
-			checkErr:  true,
+			checkErr:  false,
 		},
 		{
 			input:  plainMessage,
