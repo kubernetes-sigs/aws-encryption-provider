@@ -48,7 +48,7 @@ func (p *SharedHealthCheck) Start() {
 			p.healthCheckClosed <- struct{}{}
 			return
 		case err := <-p.healthCheckErrc:
-			p.recordErr(err)
+			p.RecordErr(err)
 		}
 	}
 }
@@ -68,7 +68,7 @@ func (p *SharedHealthCheck) isRecentlyChecked() (bool, error) {
 	return !never && latest, err
 }
 
-func (p *SharedHealthCheck) recordErr(err error) {
+func (p *SharedHealthCheck) RecordErr(err error) {
 	p.lastMu.Lock()
 	p.lastErr, p.lastTs = err, time.Now()
 	p.lastMu.Unlock()

@@ -1,6 +1,7 @@
 package kmsplugin
 
 import (
+	"context"
 	"errors"
 	"strings"
 	"time"
@@ -52,6 +53,11 @@ func ParseError(err error) (errorType KMSErrorType) {
 		// in case the error was not wrapped,
 		// preserve the original error type
 		uerr = err
+	}
+
+	// if error is due to context cancelled, it means the customer cancelled their request and is user-induced
+	if errors.Is(uerr, context.Canceled) {
+		return KMSErrorTypeUserInduced
 	}
 
 	var ae smithy.APIError
