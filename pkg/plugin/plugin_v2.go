@@ -110,9 +110,15 @@ func (p *V2Plugin) Health() error {
 	return err
 }
 
+// Live checks the liveness of KMS API.
+// If the error is user-induced (e.g., revoke CMK) or throttled, the function returns NO error.
+// If the error is due to KMS availability, the function returns the error.
 func (p *V2Plugin) Live() error {
-	if err := p.Health(); err != nil && kmsplugin.ParseError(err) != kmsplugin.KMSErrorTypeUserInduced {
-		return err
+	if err := p.Health(); err != nil {
+		errType := kmsplugin.ParseError(err)
+		if errType != kmsplugin.KMSErrorTypeUserInduced && errType != kmsplugin.KMSErrorTypeThrottled {
+			return err
+		}
 	}
 	return nil
 }
