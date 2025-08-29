@@ -113,7 +113,9 @@ func TestEncrypt(t *testing.T) {
 			t.Fatalf("Returned unexpected error: %v", err)
 		}
 
+		//nolint:staticcheck
 		if tc.err == nil && string(eRes.Cipher) != kmsplugin.StorageVersion+tc.output {
+			//nolint:staticcheck
 			t.Fatalf("Expected %s, but got %s", kmsplugin.StorageVersion+tc.output, string(eRes.Cipher))
 		}
 	}
@@ -176,7 +178,9 @@ func TestDecrypt(t *testing.T) {
 			t.Fatalf("Returned unexpected error: %v", err)
 		}
 
+		//nolint:staticcheck
 		if tc.err == nil && string(dRes.Plain) != tc.output {
+			//nolint:staticcheck
 			t.Fatalf("Expected %s, but got %s", tc.output, string(dRes.Plain))
 		}
 	}

@@ -54,6 +54,7 @@ func main() {
 		log.Fatalf("Failed to get version: %v", err)
 	}
 
+	//nolint:staticcheck
 	fmt.Println("Connected to GRPC Server", vRes.Version, vRes.RuntimeName, vRes.RuntimeVersion)
 
 	reader := bufio.NewReader(os.Stdin)
@@ -73,6 +74,7 @@ func main() {
 			if err != nil {
 				log.Fatalf("Failed to encrypt: %v", err)
 			}
+			//nolint:staticcheck
 			fmt.Println(base64.StdEncoding.EncodeToString(res.Cipher))
 		case "decrypt":
 			b, err := base64.StdEncoding.DecodeString(splits[1])
@@ -85,6 +87,7 @@ func main() {
 			if err != nil {
 				log.Fatalf("Failed to encrypt: %v", err)
 			}
+			//nolint:staticcheck
 			fmt.Println(string(res.Plain))
 		}
 	}

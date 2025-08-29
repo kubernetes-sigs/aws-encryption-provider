@@ -36,6 +36,7 @@ const (
 
 // Plugin implements the KeyManagementServiceServer
 type V1Plugin struct {
+	pb.UnimplementedKeyManagementServiceServer
 	svc           cloud.AWSKMSv2
 	keyID         string
 	encryptionCtx map[string]string
