@@ -99,6 +99,11 @@ func TestParseError(t *testing.T) {
 			expected: KMSErrorTypeUserInduced,
 		},
 		{
+			name:     "AccessDeniedException caused by explicit deny in resource policy",
+			err:      &mockAPIError{code: "AccessDeniedException", message: "User dummy is not authorized to perform: kms:Decrypt on this resource with an explicit deny in a resource control policy"},
+			expected: KMSErrorTypeUserInduced,
+		},
+		{
 			name:     "Other AccessDeniedException",
 			err:      &mockAPIError{code: "AccessDeniedException", message: "access denied for some other reason"},
 			expected: KMSErrorTypeOther,

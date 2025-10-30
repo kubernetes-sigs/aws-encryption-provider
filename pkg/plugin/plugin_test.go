@@ -117,6 +117,19 @@ func TestEncrypt(t *testing.T) {
 			output: "",
 			err: &smithy.GenericAPIError{
 				Code:    "AccessDeniedException",
+				Message: "User dummy is not authorized to perform: kms:Decrypt on this resource with an explicit deny in a resource control policy",
+				Fault:   0,
+			},
+			errType:   kmsplugin.KMSErrorTypeUserInduced,
+			healthErr: true,
+			checkErr:  false,
+		},
+		{
+			input:  plainMessage,
+			ctx:    nil,
+			output: "",
+			err: &smithy.GenericAPIError{
+				Code:    "AccessDeniedException",
 				Message: "Some other error message",
 				Fault:   0,
 			},
