@@ -18,12 +18,20 @@ import (
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/aws/arn"
 	"github.com/aws/aws-sdk-go-v2/aws/ratelimit"
 	"github.com/aws/aws-sdk-go-v2/aws/retry"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/feature/ec2/imds"
 	"github.com/aws/aws-sdk-go-v2/service/kms"
+	smithymiddleware "github.com/aws/smithy-go/middleware"
+	smithyhttp "github.com/aws/smithy-go/transport/http"
 	"go.uber.org/zap"
+)
+
+const (
+	headerSourceArn     = "x-amz-source-arn"
+	headerSourceAccount = "x-amz-source-account"
 )
 
 type AWSKMSv2 interface {
@@ -31,7 +39,7 @@ type AWSKMSv2 interface {
 	Decrypt(ctx context.Context, params *kms.DecryptInput, optFns ...func(*kms.Options)) (*kms.DecryptOutput, error)
 }
 
-func New(region, kmsEndpoint string, qps, burst, retryTokenCapacity int) (AWSKMSv2, error) {
+func New(region, kmsEndpoint string, qps, burst, retryTokenCapacity int, sourceArn string) (AWSKMSv2, error) {
 	var optFns []func(*config.LoadOptions) error
 	if region != "" {
 		optFns = append(optFns, config.WithRegion(region))
@@ -69,6 +77,11 @@ func New(region, kmsEndpoint string, qps, burst, retryTokenCapacity int) (AWSKMS
 		return nil, fmt.Errorf("failed to create AWS config: %w", err)
 	}
 
+	err = addConfusedDeputyHeaders(&cfg, sourceArn)
+	if err != nil {
+		return nil, err
+	}
+
 	if cfg.Region == "" {
 		ec2 := imds.NewFromConfig(cfg)
 		region, err := ec2.GetRegion(context.Background(), &imds.GetRegionInput{})
@@ -87,4 +100,49 @@ func New(region, kmsEndpoint string, qps, burst, retryTokenCapacity int) (AWSKMS
 
 	client := kms.NewFromConfig(cfg, kmsOptFns...)
 	return client, nil
+}
+
+func addConfusedDeputyHeaders(cfg *aws.Config, sourceArn string) error {
+	if sourceArn != "" {
+		sourceAccount, err := getSourceAccount(sourceArn)
+		if err != nil {
+			return err
+		}
+
+		cfg.APIOptions = append(cfg.APIOptions, func(stack *smithymiddleware.Stack) error {
+			return stack.Build.Add(smithymiddleware.BuildMiddlewareFunc("KMSConfusedDeputyHeaders", func(
+				ctx context.Context, in smithymiddleware.BuildInput, next smithymiddleware.BuildHandler,
+			) (smithymiddleware.BuildOutput, smithymiddleware.Metadata, error) {
+				req, ok := in.Request.(*smithyhttp.Request)
+				if ok {
+					req.Header.Set(headerSourceAccount, sourceAccount)
+					req.Header.Set(headerSourceArn, sourceArn)
+				}
+				return next.HandleBuild(ctx, in)
+			}), smithymiddleware.Before)
+		})
+
+		zap.L().Info("configuring KMS client with confused deputy headers",
+			zap.String("sourceArn", sourceArn),
+			zap.String("sourceAccount", sourceAccount),
+		)
+	}
+	return nil
+}
+
+// getSourceAccount constructs source account and return them for use
+func getSourceAccount(sourceArn string) (string, error) {
+	// ARN format (https://docs.aws.amazon.com/IAM/latest/UserGuide/reference-arns.html)
+	// arn:partition:service:region:account-id:resource-type/resource-id
+	// arn:aws:eks:region:account:cluster/cluster-name
+	if !arn.IsARN(sourceArn) {
+		return "", fmt.Errorf("incorrect ARN format for source arn: %s", sourceArn)
+	}
+
+	parsedArn, err := arn.Parse(sourceArn)
+	if err != nil {
+		return "", err
+	}
+
+	return parsedArn.AccountID, nil
 }
