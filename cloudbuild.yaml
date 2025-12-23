@@ -5,15 +5,15 @@ options:
   dynamic_substitutions: true
 
 steps:
-  - name: 'gcr.io/k8s-staging-test-infra/gcb-docker-gcloud:v20250116-2a05ea7e3d'
+  - name: "gcr.io/k8s-staging-test-infra/gcb-docker-gcloud:v20250116-2a05ea7e3d"
     entrypoint: make
     env:
       - REPO=us-central1-docker.pkg.dev/k8s-staging-images/aws-encryption-provider
       - IMAGE=aws-encryption-provider
       - TAG=$_GIT_TAG
     args:
-      - build-docker
+      - release-docker
 
 substitutions:
-  _GIT_TAG: '12345'
-  _PULL_BASE_REF: 'master'
+  _GIT_TAG: "12345"
+  _PULL_BASE_REF: "master"
