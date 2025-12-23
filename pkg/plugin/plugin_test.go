@@ -206,7 +206,6 @@ func TestEncrypt(t *testing.T) {
 				sharedHealthCheck.Stop()
 			}()
 
-			//nolint:staticcheck
 			eReq := &pb.EncryptRequest{Plain: []byte(tc.input)}
 			eRes, err := p.Encrypt(ctx, eReq)
 
@@ -285,7 +284,6 @@ func TestDecrypt(t *testing.T) {
 				sharedHealthCheck.Stop()
 			}()
 
-			//nolint:staticcheck
 			dReq := &pb.DecryptRequest{Cipher: []byte(tc.input)}
 			dRes, err := p.Decrypt(ctx, dReq)
 
@@ -332,7 +330,6 @@ func TestHealth(t *testing.T) {
 		c.SetEncryptResp("foo", entry.encryptErr)
 		c.SetDecryptResp("foo", entry.decryptErr)
 
-		//nolint:staticcheck
 		_, encErr := p.Encrypt(context.Background(), &pb.EncryptRequest{Plain: []byte("foo")})
 		if entry.encryptErr == nil && encErr != nil {
 			t.Fatalf("#%d: unexpected error from Encrypt %v", idx, encErr)
@@ -346,7 +343,6 @@ func TestHealth(t *testing.T) {
 			t.Fatalf("#%d: unexpected error from Health %v", idx, herr1)
 		}
 
-		//nolint:staticcheck
 		_, decErr := p.Decrypt(context.Background(), &pb.DecryptRequest{Cipher: []byte("foo")})
 		if entry.decryptErr == nil && decErr != nil {
 			t.Fatalf("#%d: unexpected error from Encrypt %v", idx, decErr)
@@ -379,7 +375,7 @@ func TestHealthManyRequests(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		errc := make(chan error)
 		go func() {
-			//nolint:staticcheck
+
 			_, err := p.Encrypt(
 				context.Background(),
 				&pb.EncryptRequest{Plain: []byte("foo")},

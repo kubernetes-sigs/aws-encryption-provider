@@ -1,0 +1,15 @@
+version: "2"
+
+# golangci-lint configuration
+# https://golangci-lint.run/usage/configuration/
+
+linters:
+  enable:
+    - staticcheck
+  exclusions:
+    rules:
+      # Exclude SA1019 (deprecated) warnings for v1beta1 KMS API
+      # v1beta1 KMS API is intentionally used for backwards compatibility
+      - linters:
+          - staticcheck
+        text: "SA1019:"
