@@ -101,7 +101,6 @@ func TestEncrypt(t *testing.T) {
 	for _, tc := range tt {
 		mock.SetEncryptResp(tc.output, tc.err)
 
-		//nolint:staticcheck
 		eReq := &pb.EncryptRequest{Plain: []byte(tc.input)}
 		eRes, err := client.Encrypt(ctx, eReq)
 
@@ -164,7 +163,6 @@ func TestDecrypt(t *testing.T) {
 	for _, tc := range tt {
 		mock.SetDecryptResp(tc.output, tc.err)
 
-		//nolint:staticcheck
 		dReq := &pb.DecryptRequest{Cipher: []byte(tc.input)}
 		dRes, err := client.Decrypt(ctx, dReq)
 
