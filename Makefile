@@ -19,8 +19,17 @@ test:
 
 build-docker:
 	docker buildx build \
-		--output=type=docker \
+		--load \
 		--platform=linux/$(GOARCH) \
+		-t ${REPO}/${IMAGE}:latest \
+		-t ${REPO}/${IMAGE}:${TAG} \
+		--build-arg BUILDER=$(shell hack/setup-go.sh) \
+		--build-arg TAG=${TAG} .
+
+release-docker:
+	docker buildx build \
+		--push \
+		--platform=linux/amd64,linux/arm64 \
 		-t ${REPO}/${IMAGE}:latest \
 		-t ${REPO}/${IMAGE}:${TAG} \
 		--build-arg BUILDER=$(shell hack/setup-go.sh) \
@@ -31,4 +40,3 @@ build-server:
 
 build-client:
 	TAG=${TAG} hack/build-client.sh
-
