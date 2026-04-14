@@ -8,7 +8,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-ARG BUILDER=public.ecr.aws/eks-distro-build-tooling/golang:1.25.8-gcc
+ARG BUILDER=public.ecr.aws/eks-distro-build-tooling/golang:1.25.9-gcc
 ARG BASE_IMAGE=public.ecr.aws/eks-distro/kubernetes/go-runner:v0.18.0-eks-1-35-latest
 
 FROM --platform=$BUILDPLATFORM ${BUILDER} AS build
@@ -17,7 +17,7 @@ ARG TAG
 COPY . ./
 ENV GO111MODULE=on
 ARG TARGETOS TARGETARCH
-RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -ldflags \
+RUN GOPROXY=direct GOSUMDB=off GONOSUMDB="*" CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -ldflags \
     "-w -s -X sigs.k8s.io/aws-encryption-provider/pkg/version.Version=$TAG" \
     -o bin/aws-encryption-provider cmd/server/main.go
 
