@@ -5,7 +5,7 @@ options:
   dynamic_substitutions: true
 
 steps:
-  - name: 'gcr.io/k8s-staging-test-infra/gcb-docker-gcloud:v20250116-2a05ea7e3d'
+  - name: 'gcr.io/k8s-staging-test-infra/gcb-docker-gcloud:v20260205-38cfa9523f'
     entrypoint: make
     env:
       - REPO=us-central1-docker.pkg.dev/k8s-staging-images/aws-encryption-provider
