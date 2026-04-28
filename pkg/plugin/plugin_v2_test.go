@@ -444,3 +444,50 @@ func TestHealthManyRequestsV2(t *testing.T) {
 		}
 	}
 }
+
+func TestHealthTimeoutV2(t *testing.T) {
+	zap.ReplaceGlobals(zap.NewExample())
+
+	c := &cloud.KMSMock{}
+	c.SetEncryptResp("foo", nil)
+	c.SetEncryptDelay(6 * time.Second) // longer than 5s timeout
+
+	sharedHealthCheck := NewSharedHealthCheck(DefaultHealthCheckPeriod, DefaultErrcBufSize)
+	go sharedHealthCheck.Start()
+	defer sharedHealthCheck.Stop()
+
+	p := NewV2(key, c, nil, sharedHealthCheck)
+
+	err := p.Health()
+
+	if err == nil {
+		t.Fatal("expected timeout error, got nil")
+	}
+	if !errors.Is(err, context.DeadlineExceeded) && !strings.Contains(err.Error(), "context deadline exceeded") {
+		t.Fatalf("expected deadline exceeded error, got: %v", err)
+	}
+}
+
+func TestHealthDecryptTimeoutV2(t *testing.T) {
+	zap.ReplaceGlobals(zap.NewExample())
+
+	c := &cloud.KMSMock{}
+	c.SetEncryptResp("foo", nil)
+	c.SetDecryptResp("foo", nil)
+	c.SetDecryptDelay(6 * time.Second) // longer than 5s timeout
+
+	sharedHealthCheck := NewSharedHealthCheck(DefaultHealthCheckPeriod, DefaultErrcBufSize)
+	go sharedHealthCheck.Start()
+	defer sharedHealthCheck.Stop()
+
+	p := NewV2(key, c, nil, sharedHealthCheck)
+
+	err := p.Health()
+
+	if err == nil {
+		t.Fatal("expected timeout error, got nil")
+	}
+	if !errors.Is(err, context.DeadlineExceeded) && !strings.Contains(err.Error(), "context deadline exceeded") {
+		t.Fatalf("expected deadline exceeded error, got: %v", err)
+	}
+}

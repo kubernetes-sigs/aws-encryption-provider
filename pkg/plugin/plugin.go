@@ -91,8 +91,9 @@ func newPlugin(
 func (p *V1Plugin) Health() error {
 	recent, err := p.healthCheck.isRecentlyChecked()
 	if !recent {
-
-		_, err = p.Encrypt(context.Background(), &pb.EncryptRequest{Plain: []byte("foo")})
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_, err = p.Encrypt(ctx, &pb.EncryptRequest{Plain: []byte("foo")})
 		p.healthCheck.RecordErr(err)
 		if err != nil {
 			zap.L().Warn("health check failed", zap.Error(err))
