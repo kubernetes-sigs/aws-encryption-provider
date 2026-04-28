@@ -392,3 +392,26 @@ func TestHealthManyRequests(t *testing.T) {
 		}
 	}
 }
+
+func TestHealthTimeout(t *testing.T) {
+	zap.ReplaceGlobals(zap.NewExample())
+
+	c := &cloud.KMSMock{}
+	c.SetEncryptResp("foo", nil)
+	c.SetEncryptDelay(6 * time.Second) // longer than 5s timeout
+
+	sharedHealthCheck := NewSharedHealthCheck(DefaultHealthCheckPeriod, DefaultErrcBufSize)
+	go sharedHealthCheck.Start()
+	defer sharedHealthCheck.Stop()
+
+	p := New(key, c, nil, sharedHealthCheck)
+
+	err := p.Health()
+
+	if err == nil {
+		t.Fatal("expected timeout error, got nil")
+	}
+	if !errors.Is(err, context.DeadlineExceeded) && !strings.Contains(err.Error(), "context deadline exceeded") {
+		t.Fatalf("expected deadline exceeded error, got: %v", err)
+	}
+}

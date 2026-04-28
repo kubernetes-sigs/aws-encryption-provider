@@ -22,7 +22,7 @@ go version
 
 if ! which golangci-lint > /dev/null; then
     echo "Cannot find golangci-lint. Installing golangci-lint..."
-    GO111MODULE=on go install -v github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.1.2
+    GO111MODULE=on go install -v github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.11.4
 fi
 
 $(go env GOPATH)/bin/golangci-lint run --timeout=10m
