@@ -15,6 +15,7 @@ package plugin
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -181,6 +182,10 @@ func (p *V2Plugin) Decrypt(ctx context.Context, request *pb.DecryptRequest) (*pb
 	zap.L().Debug("starting decrypt operation")
 
 	startTime := time.Now()
+
+	if len(request.Ciphertext) == 0 {
+		return nil, errors.New("invalid empty ciphertext")
+	}
 	storageVersion := kmsplugin.KMSStorageVersion(request.Ciphertext[0])
 	switch storageVersion {
 	case kmsplugin.KMSStorageVersionV2:

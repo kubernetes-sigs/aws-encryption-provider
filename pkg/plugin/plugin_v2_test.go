@@ -491,3 +491,49 @@ func TestHealthDecryptTimeoutV2(t *testing.T) {
 		t.Fatalf("expected deadline exceeded error, got: %v", err)
 	}
 }
+
+func TestDecryptEmptyCiphertextV2(t *testing.T) {
+	zap.ReplaceGlobals(zap.NewExample())
+
+	c := &cloud.KMSMock{}
+	ctx := context.Background()
+
+	sharedHealthCheck := NewSharedHealthCheck(DefaultHealthCheckPeriod, DefaultErrcBufSize)
+	go sharedHealthCheck.Start()
+	defer sharedHealthCheck.Stop()
+
+	p := NewV2(key, c, nil, sharedHealthCheck)
+
+	dReq := &pb.DecryptRequest{Ciphertext: []byte{}}
+	_, err := p.Decrypt(ctx, dReq)
+
+	if err == nil {
+		t.Fatal("expected error for empty ciphertext, got nil")
+	}
+	if !strings.Contains(err.Error(), "invalid empty ciphertext") {
+		t.Fatalf("expected 'invalid empty ciphertext' error, got: %v", err)
+	}
+}
+
+func TestDecryptNilCiphertextV2(t *testing.T) {
+	zap.ReplaceGlobals(zap.NewExample())
+
+	c := &cloud.KMSMock{}
+	ctx := context.Background()
+
+	sharedHealthCheck := NewSharedHealthCheck(DefaultHealthCheckPeriod, DefaultErrcBufSize)
+	go sharedHealthCheck.Start()
+	defer sharedHealthCheck.Stop()
+
+	p := NewV2(key, c, nil, sharedHealthCheck)
+
+	dReq := &pb.DecryptRequest{Ciphertext: nil}
+	_, err := p.Decrypt(ctx, dReq)
+
+	if err == nil {
+		t.Fatal("expected error for nil ciphertext, got nil")
+	}
+	if !strings.Contains(err.Error(), "invalid empty ciphertext") {
+		t.Fatalf("expected 'invalid empty ciphertext' error, got: %v", err)
+	}
+}

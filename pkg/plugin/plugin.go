@@ -15,6 +15,7 @@ package plugin
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -177,6 +178,10 @@ func (p *V1Plugin) Decrypt(ctx context.Context, request *pb.DecryptRequest) (*pb
 	zap.L().Debug("starting decrypt operation")
 
 	startTime := time.Now()
+
+	if len(request.Cipher) == 0 {
+		return nil, errors.New("invalid empty ciphertext")
+	}
 	if string(request.Cipher[0]) == kmsplugin.StorageVersion {
 		request.Cipher = request.Cipher[1:]
 	}
