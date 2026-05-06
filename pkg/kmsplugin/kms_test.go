@@ -114,6 +114,11 @@ func TestParseError(t *testing.T) {
 			expected: KMSErrorTypeUserInduced,
 		},
 		{
+			name:     "KMSInternalException with external key store proxy communication failure",
+			err:      &mockAPIError{code: (&types.KMSInternalException{}).ErrorCode(), message: "AWS KMS cannot communicate with the external key store proxy"},
+			expected: KMSErrorTypeUserInduced,
+		},
+		{
 			name:     "KMSInternalException with other message",
 			err:      &mockAPIError{code: (&types.KMSInternalException{}).ErrorCode(), message: "Some other internal error"},
 			expected: KMSErrorTypeOther,
