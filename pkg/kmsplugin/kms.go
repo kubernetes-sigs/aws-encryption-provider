@@ -117,6 +117,30 @@ func ParseError(err error) (errorType KMSErrorType) {
 	return KMSErrorTypeOther
 }
 
+// IsKeyRevoked reports whether the error means the KMS key is disabled or has been deleted.
+//
+// Only these two documented error codes are matched, never error messages, because other
+// error codes can also be returned for transient or configuration failures.
+func IsKeyRevoked(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	var ae smithy.APIError
+	if !errors.As(err, &ae) {
+		return false
+	}
+
+	switch ae.ErrorCode() {
+	// CMK is disabled or has been deleted
+	case (&kmstypes.DisabledException{}).ErrorCode(),
+		(&kmstypes.NotFoundException{}).ErrorCode():
+		return true
+	}
+
+	return false
+}
+
 const (
 	StatusSuccess           = "success"
 	StatusFailure           = "failure"

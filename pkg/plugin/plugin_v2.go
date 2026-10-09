@@ -23,6 +23,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/kms"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	pb "k8s.io/kms/apis/v2"
 	"sigs.k8s.io/aws-encryption-provider/pkg/cloud"
 	"sigs.k8s.io/aws-encryption-provider/pkg/kmsplugin"
@@ -128,14 +130,22 @@ func (p *V2Plugin) Live() error {
 }
 
 // Status returns the V2Plugin server status
+//
+// If the KMS key is disabled or deleted, Status returns an error instead of a response,
+// so the kube-apiserver stops using the key for new data. Status returns to normal once
+// the key is usable again.
 func (p *V2Plugin) Status(ctx context.Context, request *pb.StatusRequest) (*pb.StatusResponse, error) {
-	status := "ok"
-	if p.Health() != nil {
-		status = "err"
+	healthz := "ok"
+	if err := p.Health(); err != nil {
+		if p.healthCheck.isKeyRevoked() {
+			zap.L().Error("KMS key revoked, failing status", zap.Error(err))
+			return nil, status.Errorf(codes.FailedPrecondition, "KMS key revoked: %v", err)
+		}
+		healthz = "err"
 	}
 	return &pb.StatusResponse{
 		Version: "v2beta1",
-		Healthz: status,
+		Healthz: healthz,
 		KeyId:   p.keyID,
 	}, nil
 }
