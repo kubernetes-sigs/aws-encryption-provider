@@ -107,7 +107,8 @@ func ParseError(err error) (errorType KMSErrorType) {
 			return KMSErrorTypeUserInduced
 		}
 	// Sometimes this error message is returned as part of KMSInvalidStateException or KMSInternalException
-	case (&kmstypes.KMSInternalException{}).ErrorCode():
+	case (&kmstypes.KMSInternalException{}).ErrorCode(),
+		(&kmstypes.KMSInvalidStateException{}).ErrorCode():
 		if strings.Contains(ae.ErrorMessage(), "AWS KMS rejected the request because the external key store proxy did not respond in time. Retry the request. If you see this error repeatedly, report it to your external key store proxy administrator") ||
 			strings.Contains(ae.ErrorMessage(), "AWS KMS cannot communicate with the external key store proxy") {
 			return KMSErrorTypeUserInduced

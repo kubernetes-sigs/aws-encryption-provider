@@ -59,6 +59,11 @@ func TestParseError(t *testing.T) {
 			expected: KMSErrorTypeUserInduced,
 		},
 		{
+			name:     "KMSInvalidStateException with external key store proxy communication failure",
+			err:      &mockAPIError{code: (&types.KMSInvalidStateException{}).ErrorCode(), message: "AWS KMS cannot communicate with the external key store proxy. This might be a transient network issue. If you see this error repeatedly, verify that your external key store proxy is active and is connected to the network, and that its endpoint URI is correct in your external key store."},
+			expected: KMSErrorTypeUserInduced,
+		},
+		{
 			name:     "KeyUnavailableException",
 			err:      &mockAPIError{code: (&types.KeyUnavailableException{}).ErrorCode()},
 			expected: KMSErrorTypeUserInduced,
@@ -121,6 +126,11 @@ func TestParseError(t *testing.T) {
 		{
 			name:     "KMSInternalException with external key store proxy communication failure",
 			err:      &mockAPIError{code: (&types.KMSInternalException{}).ErrorCode(), message: "AWS KMS cannot communicate with the external key store proxy"},
+			expected: KMSErrorTypeUserInduced,
+		},
+		{
+			name:     "KMSInternalException with full external key store proxy communication failure message",
+			err:      &mockAPIError{code: (&types.KMSInternalException{}).ErrorCode(), message: "AWS KMS cannot communicate with the external key store proxy. This might be a transient network issue. If you see this error repeatedly, verify that your external key store proxy is active and is connected to the network, and that its endpoint URI is correct in your external key store."},
 			expected: KMSErrorTypeUserInduced,
 		},
 		{
