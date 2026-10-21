@@ -3,6 +3,7 @@ package kmsplugin
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/service/kms/types"
@@ -144,6 +145,131 @@ func TestParseError(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			result := ParseError(tt.err)
 			assert.Equal(t, tt.expected, result, "ParseError returned incorrect error type")
+		})
+	}
+}
+
+func TestIsKeyRevoked(t *testing.T) {
+	tests := []struct {
+		name     string
+		err      error
+		expected bool
+	}{
+		{
+			name:     "nil error",
+			err:      nil,
+			expected: false,
+		},
+		{
+			name:     "non-API error",
+			err:      errors.New("generic error"),
+			expected: false,
+		},
+		{
+			name:     "DisabledException",
+			err:      &mockAPIError{code: (&types.DisabledException{}).ErrorCode()},
+			expected: true,
+		},
+		{
+			name:     "NotFoundException",
+			err:      &mockAPIError{code: (&types.NotFoundException{}).ErrorCode()},
+			expected: true,
+		},
+		{
+			name:     "KMSInvalidStateException",
+			err:      &mockAPIError{code: (&types.KMSInvalidStateException{}).ErrorCode()},
+			expected: false,
+		},
+		{
+			name:     "KMSInvalidStateException with message",
+			err:      &mockAPIError{code: (&types.KMSInvalidStateException{}).ErrorCode(), message: "test"},
+			expected: false,
+		},
+		{
+			name:     "KMSInvalidStateException with custom key store message",
+			err:      &mockAPIError{code: (&types.KMSInvalidStateException{}).ErrorCode(), message: "The custom key store associated with this KMS key is not connected"},
+			expected: false,
+		},
+		{
+			name:     "KMSInvalidStateException with external key store proxy message",
+			err:      &mockAPIError{code: (&types.KMSInvalidStateException{}).ErrorCode(), message: "AWS KMS cannot communicate with the external key store proxy"},
+			expected: false,
+		},
+		{
+			name:     "AccessDeniedException",
+			err:      &mockAPIError{code: "AccessDeniedException"},
+			expected: false,
+		},
+		{
+			name:     "AccessDeniedException with not authorized message",
+			err:      &mockAPIError{code: "AccessDeniedException", message: "User xxx is not authorized to perform: kms:Encrypt on this resource"},
+			expected: false,
+		},
+		{
+			name:     "AccessDeniedException with resource control policy message",
+			err:      &mockAPIError{code: "AccessDeniedException", message: "User xxx is not authorized to perform: kms:Encrypt on this resource with an explicit deny in a resource control policy"},
+			expected: false,
+		},
+		{
+			name:     "AccessDeniedException with account not active message",
+			err:      &mockAPIError{code: "AccessDeniedException", message: "User xxx is not authorized to perform: kms:Encrypt because the resource owner's account is not active"},
+			expected: false,
+		},
+		{
+			name:     "AccessDeniedException with identity-based policy message",
+			err:      &mockAPIError{code: "AccessDeniedException", message: "User xxx is not authorized to perform: kms:Encrypt on this resource with an explicit deny in an identity-based policy"},
+			expected: false,
+		},
+		{
+			name:     "AccessDeniedException with does not exist message",
+			err:      &mockAPIError{code: "AccessDeniedException", message: "The ciphertext refers to a customer master key that does not exist, does not exist in this region, or you are not allowed to access."},
+			expected: false,
+		},
+		{
+			name:     "AccessDeniedException with no resource-based policies allow access message",
+			err:      &mockAPIError{code: "AccessDeniedException", message: "User xxx is not authorized to perform: kms:Encrypt on this resource because the resource does not exist in this Region, no resource-based policies allow access, or a resource-based policy explicitly denies access"},
+			expected: false,
+		},
+		{
+			name:     "KeyUnavailableException",
+			err:      &mockAPIError{code: (&types.KeyUnavailableException{}).ErrorCode()},
+			expected: false,
+		},
+		{
+			name:     "KMSInternalException",
+			err:      &mockAPIError{code: (&types.KMSInternalException{}).ErrorCode()},
+			expected: false,
+		},
+		{
+			name:     "LimitExceededException",
+			err:      &mockAPIError{code: (&types.LimitExceededException{}).ErrorCode()},
+			expected: false,
+		},
+		{
+			name:     "InvalidCiphertextException",
+			err:      &mockAPIError{code: (&types.InvalidCiphertextException{}).ErrorCode()},
+			expected: false,
+		},
+		{
+			name:     "InvalidGrantTokenException",
+			err:      &mockAPIError{code: (&types.InvalidGrantTokenException{}).ErrorCode()},
+			expected: false,
+		},
+		{
+			name:     "wrapped DisabledException",
+			err:      fmt.Errorf("failed to encrypt %w", &mockAPIError{code: (&types.DisabledException{}).ErrorCode()}),
+			expected: true,
+		},
+		{
+			name:     "context cancelled",
+			err:      context.Canceled,
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, IsKeyRevoked(tt.err), "IsKeyRevoked returned incorrect result")
 		})
 	}
 }
