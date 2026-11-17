@@ -48,6 +48,7 @@ func main() {
 		burstLimit         = flag.Int("burst-limit", 0, "(deprecated) number of tokens that can be consumed in a single call, use --retry-token-capacity instead")
 		retryTokenCapacity = flag.Int("retry-token-capacity", 0, "number of tokens for client-side AWS rate-limiting on retries")
 		encryptionCtxsArr  = flag.StringArray("encryption-context", []string{}, "AWS KMS Encryption Context (e.g. 'a=b,c=d')")
+		sourceArn          = flag.String("source-arn", "", "AWS source ARN for confused deputy protection")
 		debug              = flag.Bool("debug", false, "Print debug level logs")
 	)
 	flag.Parse()
@@ -92,7 +93,7 @@ func main() {
 		zap.Int("burst-limit", *burstLimit),
 		zap.Int("retry-token-capacity", *retryTokenCapacity),
 	)
-	c, err := cloud.New(*region, *kmsEndpoint, *qpsLimit, *burstLimit, *retryTokenCapacity)
+	c, err := cloud.New(*region, *kmsEndpoint, *qpsLimit, *burstLimit, *retryTokenCapacity, *sourceArn)
 	if err != nil {
 		zap.L().Fatal("Failed to create new KMS service", zap.Error(err))
 	}

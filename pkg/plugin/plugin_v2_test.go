@@ -26,6 +26,8 @@ import (
 	kmstypes "github.com/aws/aws-sdk-go-v2/service/kms/types"
 	"github.com/aws/smithy-go"
 	"go.uber.org/zap"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	pb "k8s.io/kms/apis/v2"
 	"sigs.k8s.io/aws-encryption-provider/pkg/cloud"
 	"sigs.k8s.io/aws-encryption-provider/pkg/kmsplugin"
@@ -97,6 +99,32 @@ func TestEncryptV2(t *testing.T) {
 			err: &smithy.GenericAPIError{
 				Code:    "AccessDeniedException",
 				Message: "The ciphertext refers to a customer master key that does not exist, does not exist in this region, or you are not allowed to access",
+				Fault:   0,
+			},
+			errType:   kmsplugin.KMSErrorTypeUserInduced,
+			healthErr: true,
+			checkErr:  false,
+		},
+		{
+			input:  plainMessage,
+			ctx:    nil,
+			output: "",
+			err: &smithy.GenericAPIError{
+				Code:    "AccessDeniedException",
+				Message: "User dummy is not authorized to perform: kms:Decrypt on this resource with an explicit deny in a resource control policy",
+				Fault:   0,
+			},
+			errType:   kmsplugin.KMSErrorTypeUserInduced,
+			healthErr: true,
+			checkErr:  false,
+		},
+		{
+			input:  plainMessage,
+			ctx:    nil,
+			output: "",
+			err: &smithy.GenericAPIError{
+				Code:    "AccessDeniedException",
+				Message: "User dummy is not authorized to perform: kms:Decrypt on this resource because the resource owner's account is not active",
 				Fault:   0,
 			},
 			errType:   kmsplugin.KMSErrorTypeUserInduced,
@@ -429,5 +457,207 @@ func TestHealthManyRequestsV2(t *testing.T) {
 				t.Fatalf("#%d: unexpected errro %v", i, err)
 			}
 		}
+	}
+}
+
+func TestHealthTimeoutV2(t *testing.T) {
+	zap.ReplaceGlobals(zap.NewExample())
+
+	c := &cloud.KMSMock{}
+	c.SetEncryptResp("foo", nil)
+	c.SetEncryptDelay(6 * time.Second) // longer than 5s timeout
+
+	sharedHealthCheck := NewSharedHealthCheck(DefaultHealthCheckPeriod, DefaultErrcBufSize)
+	go sharedHealthCheck.Start()
+	defer sharedHealthCheck.Stop()
+
+	p := NewV2(key, c, nil, sharedHealthCheck)
+
+	err := p.Health()
+
+	if err == nil {
+		t.Fatal("expected timeout error, got nil")
+	}
+	if !errors.Is(err, context.DeadlineExceeded) && !strings.Contains(err.Error(), "context deadline exceeded") {
+		t.Fatalf("expected deadline exceeded error, got: %v", err)
+	}
+}
+
+func TestHealthDecryptTimeoutV2(t *testing.T) {
+	zap.ReplaceGlobals(zap.NewExample())
+
+	c := &cloud.KMSMock{}
+	c.SetEncryptResp("foo", nil)
+	c.SetDecryptResp("foo", nil)
+	c.SetDecryptDelay(6 * time.Second) // longer than 5s timeout
+
+	sharedHealthCheck := NewSharedHealthCheck(DefaultHealthCheckPeriod, DefaultErrcBufSize)
+	go sharedHealthCheck.Start()
+	defer sharedHealthCheck.Stop()
+
+	p := NewV2(key, c, nil, sharedHealthCheck)
+
+	err := p.Health()
+
+	if err == nil {
+		t.Fatal("expected timeout error, got nil")
+	}
+	if !errors.Is(err, context.DeadlineExceeded) && !strings.Contains(err.Error(), "context deadline exceeded") {
+		t.Fatalf("expected deadline exceeded error, got: %v", err)
+	}
+}
+
+func TestDecryptEmptyCiphertextV2(t *testing.T) {
+	zap.ReplaceGlobals(zap.NewExample())
+
+	c := &cloud.KMSMock{}
+	ctx := context.Background()
+
+	sharedHealthCheck := NewSharedHealthCheck(DefaultHealthCheckPeriod, DefaultErrcBufSize)
+	go sharedHealthCheck.Start()
+	defer sharedHealthCheck.Stop()
+
+	p := NewV2(key, c, nil, sharedHealthCheck)
+
+	dReq := &pb.DecryptRequest{Ciphertext: []byte{}}
+	_, err := p.Decrypt(ctx, dReq)
+
+	if err == nil {
+		t.Fatal("expected error for empty ciphertext, got nil")
+	}
+	if !strings.Contains(err.Error(), "invalid empty ciphertext") {
+		t.Fatalf("expected 'invalid empty ciphertext' error, got: %v", err)
+	}
+}
+
+func TestDecryptNilCiphertextV2(t *testing.T) {
+	zap.ReplaceGlobals(zap.NewExample())
+
+	c := &cloud.KMSMock{}
+	ctx := context.Background()
+
+	sharedHealthCheck := NewSharedHealthCheck(DefaultHealthCheckPeriod, DefaultErrcBufSize)
+	go sharedHealthCheck.Start()
+	defer sharedHealthCheck.Stop()
+
+	p := NewV2(key, c, nil, sharedHealthCheck)
+
+	dReq := &pb.DecryptRequest{Ciphertext: nil}
+	_, err := p.Decrypt(ctx, dReq)
+
+	if err == nil {
+		t.Fatal("expected error for nil ciphertext, got nil")
+	}
+	if !strings.Contains(err.Error(), "invalid empty ciphertext") {
+		t.Fatalf("expected 'invalid empty ciphertext' error, got: %v", err)
+	}
+}
+
+func TestStatusV2KeyRevoked(t *testing.T) {
+	zap.ReplaceGlobals(zap.NewExample())
+
+	tt := []struct {
+		name      string
+		err       error
+		expectErr bool
+		healthz   string
+	}{
+		{
+			name:    "healthy",
+			err:     nil,
+			healthz: "ok",
+		},
+		{
+			name:      "key disabled",
+			err:       &kmstypes.DisabledException{Message: aws.String("key is disabled")},
+			expectErr: true,
+		},
+		{
+			name:      "key deleted",
+			err:       &kmstypes.NotFoundException{Message: aws.String("key not found")},
+			expectErr: true,
+		},
+		{
+			name:    "KMSInvalidStateException",
+			err:     &kmstypes.KMSInvalidStateException{Message: aws.String("test")},
+			healthz: "err",
+		},
+		{
+			name:    "AccessDeniedException",
+			err:     &smithy.GenericAPIError{Code: "AccessDeniedException", Message: "User xxx is not authorized to perform: kms:Encrypt on this resource"},
+			healthz: "err",
+		},
+		{
+			name:    "transient KMS error",
+			err:     &kmstypes.KMSInternalException{Message: aws.String("internal error")},
+			healthz: "err",
+		},
+		{
+			name:    "throttled",
+			err:     &kmstypes.LimitExceededException{Message: aws.String("throttled")},
+			healthz: "err",
+		},
+	}
+	for _, entry := range tt {
+		t.Run(entry.name, func(t *testing.T) {
+			c := &cloud.KMSMock{}
+			c.SetEncryptResp("foo", entry.err)
+			c.SetDecryptResp("foo", nil)
+
+			// check KMS on every call and treat the key as revoked on first observation
+			sharedHealthCheck := NewSharedHealthCheck(0, DefaultErrcBufSize)
+			sharedHealthCheck.keyRevokedAfter = 0
+			p := newPluginV2(key, c, nil, sharedHealthCheck)
+
+			resp, err := p.Status(context.Background(), &pb.StatusRequest{})
+			if entry.expectErr {
+				if err == nil {
+					t.Fatalf("expected error from Status, got %+v", resp)
+				}
+				if status.Code(err) != codes.FailedPrecondition {
+					t.Fatalf("expected FailedPrecondition, got %v", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error from Status: %v", err)
+			}
+			if resp.Healthz != entry.healthz {
+				t.Fatalf("expected Healthz %q, got %q", entry.healthz, resp.Healthz)
+			}
+			if resp.KeyId != key {
+				t.Fatalf("expected KeyId %q, got %q", key, resp.KeyId)
+			}
+		})
+	}
+}
+
+func TestStatusV2KeyRevokedRecovers(t *testing.T) {
+	zap.ReplaceGlobals(zap.NewExample())
+
+	c := &cloud.KMSMock{}
+	c.SetEncryptResp("foo", &kmstypes.DisabledException{Message: aws.String("key is disabled")})
+	c.SetDecryptResp("foo", nil)
+
+	sharedHealthCheck := NewSharedHealthCheck(0, DefaultErrcBufSize)
+	sharedHealthCheck.keyRevokedAfter = 50 * time.Millisecond
+	p := newPluginV2(key, c, nil, sharedHealthCheck)
+
+	// not yet reported for keyRevokedAfter: Status reports unhealthy without an error
+	resp, err := p.Status(context.Background(), &pb.StatusRequest{})
+	if err != nil || resp.Healthz != "err" {
+		t.Fatalf("expected Healthz err without error, got resp=%+v err=%v", resp, err)
+	}
+
+	time.Sleep(60 * time.Millisecond)
+	if _, err := p.Status(context.Background(), &pb.StatusRequest{}); status.Code(err) != codes.FailedPrecondition {
+		t.Fatalf("expected FailedPrecondition after sustained revocation, got %v", err)
+	}
+
+	// key re-enabled
+	c.SetEncryptResp("foo", nil)
+	resp, err = p.Status(context.Background(), &pb.StatusRequest{})
+	if err != nil || resp.Healthz != "ok" || resp.KeyId != key {
+		t.Fatalf("expected healthy status after key re-enabled, got resp=%+v err=%v", resp, err)
 	}
 }

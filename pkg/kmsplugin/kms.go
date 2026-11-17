@@ -92,23 +92,53 @@ func ParseError(err error) (errorType KMSErrorType) {
 
 	// AWS SDK Go for KMS does not "yet" define specific error code for a case where a customer specifies the deleted key
 	// "AccessDeniedException" error code may be returned when (1) CMK does not exist (not pending delete),
-	// or (2) corresponding IAM role is not allowed to access the key.
-	// Thus we only want to mark "AccessDeniedException" as user-induced for the case (1).
+	// or (2) user explicitly denied access to the key via resource policy,
+	// or (3) corresponding IAM role is not allowed to access the key.
+	// Thus we only want to mark "AccessDeniedException" as user-induced for the case (1) and (2).
 	// e.g., "AccessDeniedException: The ciphertext refers to a customer master key that does not exist, does not exist in this region, or you are not allowed to access."
 	//       or "AccessDeniedException: User xxx is not authorized to perform: xxx on this resource because the resource does not exist in this Region, no resource-based policies allow access, or a resource-based policy explicitly denies access"
+	//       or "AccessDeniedException: User xxx is not authorized to perform: xxx on this resource with an explicit deny in a resource control policy"
+	//       or "AccessDeniedException: xxx because the resource owner's account is not active"
 	// KMS service may change the error message, so we do the string match.
 	case "AccessDeniedException":
-		if strings.Contains(ae.ErrorMessage(), "does not exist") {
+		if strings.Contains(ae.ErrorMessage(), "does not exist") ||
+			strings.Contains(ae.ErrorMessage(), "explicit deny in a resource control policy") ||
+			strings.Contains(ae.ErrorMessage(), "the resource owner's account is not active") {
 			return KMSErrorTypeUserInduced
 		}
 	// Sometimes this error message is returned as part of KMSInvalidStateException or KMSInternalException
 	case (&kmstypes.KMSInternalException{}).ErrorCode():
-		if strings.Contains(ae.ErrorMessage(), "AWS KMS rejected the request because the external key store proxy did not respond in time. Retry the request. If you see this error repeatedly, report it to your external key store proxy administrator") {
+		if strings.Contains(ae.ErrorMessage(), "AWS KMS rejected the request because the external key store proxy did not respond in time. Retry the request. If you see this error repeatedly, report it to your external key store proxy administrator") ||
+			strings.Contains(ae.ErrorMessage(), "AWS KMS cannot communicate with the external key store proxy") {
 			return KMSErrorTypeUserInduced
 		}
 	}
 
 	return KMSErrorTypeOther
+}
+
+// IsKeyRevoked reports whether the error means the KMS key is disabled or has been deleted.
+//
+// Only these two documented error codes are matched, never error messages, because other
+// error codes can also be returned for transient or configuration failures.
+func IsKeyRevoked(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	var ae smithy.APIError
+	if !errors.As(err, &ae) {
+		return false
+	}
+
+	switch ae.ErrorCode() {
+	// CMK is disabled or has been deleted
+	case (&kmstypes.DisabledException{}).ErrorCode(),
+		(&kmstypes.NotFoundException{}).ErrorCode():
+		return true
+	}
+
+	return false
 }
 
 const (

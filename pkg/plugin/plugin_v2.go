@@ -15,6 +15,7 @@ package plugin
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -22,6 +23,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/kms"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	pb "k8s.io/kms/apis/v2"
 	"sigs.k8s.io/aws-encryption-provider/pkg/cloud"
 	"sigs.k8s.io/aws-encryption-provider/pkg/kmsplugin"
@@ -35,6 +38,7 @@ const (
 
 // Plugin implements the KeyManagementServiceServer
 type V2Plugin struct {
+	pb.UnimplementedKeyManagementServiceServer
 	svc           cloud.AWSKMSv2
 	keyID         string
 	encryptionCtx map[string]string
@@ -89,13 +93,15 @@ func newPluginV2(
 func (p *V2Plugin) Health() error {
 	recent, err := p.healthCheck.isRecentlyChecked()
 	if !recent {
-		encResult, err := p.Encrypt(context.Background(), &pb.EncryptRequest{Plaintext: []byte("foo")})
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		encResult, err := p.Encrypt(ctx, &pb.EncryptRequest{Plaintext: []byte("foo")})
 		p.healthCheck.RecordErr(err)
 		if err != nil {
 			zap.L().Warn("health check failed at encryption", zap.Error(err))
 			return err
 		}
-		_, err = p.Decrypt(context.Background(), &pb.DecryptRequest{Ciphertext: encResult.Ciphertext})
+		_, err = p.Decrypt(ctx, &pb.DecryptRequest{Ciphertext: encResult.Ciphertext})
 		p.healthCheck.RecordErr(err)
 		if err != nil {
 			zap.L().Warn("health check failed at decryption", zap.Error(err))
@@ -124,14 +130,22 @@ func (p *V2Plugin) Live() error {
 }
 
 // Status returns the V2Plugin server status
+//
+// If the KMS key is disabled or deleted, Status returns an error instead of a response,
+// so the kube-apiserver stops using the key for new data. Status returns to normal once
+// the key is usable again.
 func (p *V2Plugin) Status(ctx context.Context, request *pb.StatusRequest) (*pb.StatusResponse, error) {
-	status := "ok"
-	if p.Health() != nil {
-		status = "err"
+	healthz := "ok"
+	if err := p.Health(); err != nil {
+		if p.healthCheck.isKeyRevoked() {
+			zap.L().Error("KMS key revoked, failing status", zap.Error(err))
+			return nil, status.Errorf(codes.FailedPrecondition, "KMS key revoked: %v", err)
+		}
+		healthz = "err"
 	}
 	return &pb.StatusResponse{
 		Version: "v2beta1",
-		Healthz: status,
+		Healthz: healthz,
 		KeyId:   p.keyID,
 	}, nil
 }
@@ -178,6 +192,10 @@ func (p *V2Plugin) Decrypt(ctx context.Context, request *pb.DecryptRequest) (*pb
 	zap.L().Debug("starting decrypt operation")
 
 	startTime := time.Now()
+
+	if len(request.Ciphertext) == 0 {
+		return nil, errors.New("invalid empty ciphertext")
+	}
 	storageVersion := kmsplugin.KMSStorageVersion(request.Ciphertext[0])
 	switch storageVersion {
 	case kmsplugin.KMSStorageVersionV2:

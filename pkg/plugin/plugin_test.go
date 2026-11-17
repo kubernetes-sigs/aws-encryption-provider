@@ -117,6 +117,32 @@ func TestEncrypt(t *testing.T) {
 			output: "",
 			err: &smithy.GenericAPIError{
 				Code:    "AccessDeniedException",
+				Message: "User dummy is not authorized to perform: kms:Decrypt on this resource with an explicit deny in a resource control policy",
+				Fault:   0,
+			},
+			errType:   kmsplugin.KMSErrorTypeUserInduced,
+			healthErr: true,
+			checkErr:  false,
+		},
+		{
+			input:  plainMessage,
+			ctx:    nil,
+			output: "",
+			err: &smithy.GenericAPIError{
+				Code:    "AccessDeniedException",
+				Message: "User dummy is not authorized to perform: kms:Decrypt on this resource because the resource owner's account is not active",
+				Fault:   0,
+			},
+			errType:   kmsplugin.KMSErrorTypeUserInduced,
+			healthErr: true,
+			checkErr:  false,
+		},
+		{
+			input:  plainMessage,
+			ctx:    nil,
+			output: "",
+			err: &smithy.GenericAPIError{
+				Code:    "AccessDeniedException",
 				Message: "Some other error message",
 				Fault:   0,
 			},
@@ -193,7 +219,6 @@ func TestEncrypt(t *testing.T) {
 				sharedHealthCheck.Stop()
 			}()
 
-			//nolint:staticcheck
 			eReq := &pb.EncryptRequest{Plain: []byte(tc.input)}
 			eRes, err := p.Encrypt(ctx, eReq)
 
@@ -272,7 +297,6 @@ func TestDecrypt(t *testing.T) {
 				sharedHealthCheck.Stop()
 			}()
 
-			//nolint:staticcheck
 			dReq := &pb.DecryptRequest{Cipher: []byte(tc.input)}
 			dRes, err := p.Decrypt(ctx, dReq)
 
@@ -319,7 +343,6 @@ func TestHealth(t *testing.T) {
 		c.SetEncryptResp("foo", entry.encryptErr)
 		c.SetDecryptResp("foo", entry.decryptErr)
 
-		//nolint:staticcheck
 		_, encErr := p.Encrypt(context.Background(), &pb.EncryptRequest{Plain: []byte("foo")})
 		if entry.encryptErr == nil && encErr != nil {
 			t.Fatalf("#%d: unexpected error from Encrypt %v", idx, encErr)
@@ -333,7 +356,6 @@ func TestHealth(t *testing.T) {
 			t.Fatalf("#%d: unexpected error from Health %v", idx, herr1)
 		}
 
-		//nolint:staticcheck
 		_, decErr := p.Decrypt(context.Background(), &pb.DecryptRequest{Cipher: []byte("foo")})
 		if entry.decryptErr == nil && decErr != nil {
 			t.Fatalf("#%d: unexpected error from Encrypt %v", idx, decErr)
@@ -366,7 +388,7 @@ func TestHealthManyRequests(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		errc := make(chan error)
 		go func() {
-			//nolint:staticcheck
+
 			_, err := p.Encrypt(
 				context.Background(),
 				&pb.EncryptRequest{Plain: []byte("foo")},
@@ -381,5 +403,74 @@ func TestHealthManyRequests(t *testing.T) {
 				t.Fatalf("#%d: unexpected errro %v", i, err)
 			}
 		}
+	}
+}
+
+func TestHealthTimeout(t *testing.T) {
+	zap.ReplaceGlobals(zap.NewExample())
+
+	c := &cloud.KMSMock{}
+	c.SetEncryptResp("foo", nil)
+	c.SetEncryptDelay(6 * time.Second) // longer than 5s timeout
+
+	sharedHealthCheck := NewSharedHealthCheck(DefaultHealthCheckPeriod, DefaultErrcBufSize)
+	go sharedHealthCheck.Start()
+	defer sharedHealthCheck.Stop()
+
+	p := New(key, c, nil, sharedHealthCheck)
+
+	err := p.Health()
+
+	if err == nil {
+		t.Fatal("expected timeout error, got nil")
+	}
+	if !errors.Is(err, context.DeadlineExceeded) && !strings.Contains(err.Error(), "context deadline exceeded") {
+		t.Fatalf("expected deadline exceeded error, got: %v", err)
+	}
+}
+
+func TestDecryptEmptyCipher(t *testing.T) {
+	zap.ReplaceGlobals(zap.NewExample())
+
+	c := &cloud.KMSMock{}
+	ctx := context.Background()
+
+	sharedHealthCheck := NewSharedHealthCheck(DefaultHealthCheckPeriod, DefaultErrcBufSize)
+	go sharedHealthCheck.Start()
+	defer sharedHealthCheck.Stop()
+
+	p := New(key, c, nil, sharedHealthCheck)
+
+	dReq := &pb.DecryptRequest{Cipher: []byte{}}
+	_, err := p.Decrypt(ctx, dReq)
+
+	if err == nil {
+		t.Fatal("expected error for empty ciphertext, got nil")
+	}
+	if !strings.Contains(err.Error(), "invalid empty ciphertext") {
+		t.Fatalf("expected 'invalid empty ciphertext' error, got: %v", err)
+	}
+}
+
+func TestDecryptNilCipher(t *testing.T) {
+	zap.ReplaceGlobals(zap.NewExample())
+
+	c := &cloud.KMSMock{}
+	ctx := context.Background()
+
+	sharedHealthCheck := NewSharedHealthCheck(DefaultHealthCheckPeriod, DefaultErrcBufSize)
+	go sharedHealthCheck.Start()
+	defer sharedHealthCheck.Stop()
+
+	p := New(key, c, nil, sharedHealthCheck)
+
+	dReq := &pb.DecryptRequest{Cipher: nil}
+	_, err := p.Decrypt(ctx, dReq)
+
+	if err == nil {
+		t.Fatal("expected error for nil ciphertext, got nil")
+	}
+	if !strings.Contains(err.Error(), "invalid empty ciphertext") {
+		t.Fatalf("expected 'invalid empty ciphertext' error, got: %v", err)
 	}
 }
